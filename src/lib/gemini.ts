@@ -8,7 +8,7 @@ function getAI(): GoogleGenAI {
   return _ai;
 }
 
-export type TaskType = "categorise" | "advise" | "report" | "cleanup" | "prioritise";
+export type TaskType = "categorise" | "advise" | "report" | "cleanup" | "prioritise" | "parse";
 
 const MODEL_MAP: Record<TaskType, string> = {
   categorise: "gemini-2.5-flash",
@@ -16,6 +16,7 @@ const MODEL_MAP: Record<TaskType, string> = {
   advise: "gemini-2.5-pro",
   report: "gemini-2.5-pro",
   prioritise: "gemini-2.5-pro",
+  parse: "gemini-2.5-pro",
 };
 
 export interface CategorisationResult {
@@ -372,6 +373,87 @@ Return ONLY valid JSON, no markdown.`;
   const response = await getAI().models.generateContent({
     model: MODEL_MAP.advise,
     contents: prompt,
+  });
+
+  const text = response.text || "";
+  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+  return JSON.parse(cleaned);
+}
+
+export interface PdfParsedTransaction {
+  date: string; // YYYY-MM-DD
+  rawDescription: string;
+  amount: number; // cents, negative = debit
+  balanceAfter?: number; // cents
+  statementMonth: string; // YYYY-MM
+}
+
+export async function parsePdfStatement(
+  pdfBase64: string
+): Promise<PdfParsedTransaction[]> {
+  const prompt = `You are parsing a NAB (National Australia Bank) Australian bank statement PDF.
+
+## STATEMENT LAYOUT
+The transaction table has these columns: Date | Particulars | Debits | Credits | Balance
+- "Debits" column = money OUT (purchases, payments, withdrawals). These become NEGATIVE cents.
+- "Credits" column = money IN (deposits, refunds, transfers in, salary). These become POSITIVE cents.
+- "Balance" column ends with "Cr" (in credit, positive) or "Dr" (overdrawn, negative) — use this for "balanceAfter".
+- All dollar amounts in the PDF are positive numbers — the column they appear in determines the sign.
+
+## DESCRIPTION FORMAT
+NAB card transactions are prefixed like: "V9860 12/11 Merchant Name Location"
+- "V" = Visa, "9860" = last 4 digits of card, "12/11" = DD/MM transaction initiated date
+- Keep this prefix verbatim in "rawDescription"
+
+## MULTI-LINE ENTRIES — join these into one "rawDescription":
+- Foreign currency lines: "V9860 12/11 Fs *supercellstore fspr Ref: 24871155316 Frgn Amt: 2.49 US dollar" → join into one description
+- Split merchant names: "Canter 209 Lakemba Dhillon Real Est 431552" → join continuation lines
+- BNPL instalments that wrap: "Phoenix +417 2025-11 -08 repayment 2 of 4" → join into one description
+
+## INCLUDE these transaction types:
+- Card purchases (V9860 prefix), EFTPOS, online transfers, direct debits, BPAY
+- ATM withdrawals and deposits (e.g. "NABATM Dep", "Bbl ATM")
+- Pending/uncleared items (e.g. "Uber * Eats Pending")
+- BNPL instalments (Afterpay, Phoenix, Sp lines with "1 of 4", "repayment 2 of 4" etc)
+- Reversals (e.g. "Reversal Of Debit...") — these are credits
+- Cash deposits, PayPal entries, Arshi Ubank transfers
+
+## SKIP these rows entirely (not transactions):
+- "Brought forward" and "Carried forward" (page continuation markers)
+- "Opening balance" / "Closing balance"
+- Column headers (Date, Particulars, Debits, Credits, Balance)
+- "Please Note From [date] Your Debit Int Rate Is X%"
+- "Identifying a transaction made using your NAB Visa Debit card..." (explanatory text)
+- Any other explanatory or legal text paragraphs
+
+## DATE RULES
+- Date column format is "DD Mon YYYY" (e.g. "12 Nov 2025") — convert to YYYY-MM-DD
+- "statementMonth" = "YYYY-MM" derived from the transaction date
+
+## OUTPUT FORMAT
+Each object must have exactly these fields:
+{
+  "date": "YYYY-MM-DD",
+  "rawDescription": "exact joined text from statement",
+  "amount": -1234 or 5678 (cents integer, negative = debit, positive = credit),
+  "balanceAfter": 152005 (cents integer, strip Cr/Dr suffix; Dr balance = negative cents),
+  "statementMonth": "YYYY-MM"
+}
+Omit "balanceAfter" only if no balance is shown for that transaction.
+
+Return ONLY a valid JSON array of all transactions. No markdown, no explanation, no code blocks.`;
+
+  const response = await getAI().models.generateContent({
+    model: MODEL_MAP.parse,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
+          { text: prompt },
+        ],
+      },
+    ],
   });
 
   const text = response.text || "";

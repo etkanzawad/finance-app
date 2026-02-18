@@ -11,6 +11,7 @@ import {
   Heart,
   User,
   LogOut,
+  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -18,6 +19,7 @@ const mainNavItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/wishlist", label: "Wishlist", icon: Heart },
   { href: "/bnpl", label: "BNPL Tracker", icon: CreditCard },
+  { href: "/insights", label: "Insights", icon: Sparkles },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
