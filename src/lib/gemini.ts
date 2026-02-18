@@ -1,6 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+let _ai: GoogleGenAI | null = null;
+function getAI(): GoogleGenAI {
+  if (!_ai) {
+    _ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+  }
+  return _ai;
+}
 
 export type TaskType = "categorise" | "advise" | "report" | "cleanup" | "prioritise";
 
@@ -49,7 +55,7 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
 
 Return ONLY valid JSON array, no markdown formatting.`;
 
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model: MODEL_MAP.categorise,
     contents: prompt,
   });
@@ -96,7 +102,7 @@ Return JSON with:
 
 Return ONLY valid JSON, no markdown.`;
 
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model: MODEL_MAP.advise,
     contents: prompt,
   });
@@ -147,7 +153,7 @@ Write a casual, helpful monthly report. Be direct. Return JSON with:
 
 Return ONLY valid JSON, no markdown.`;
 
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model: MODEL_MAP.report,
     contents: prompt,
   });
@@ -250,7 +256,7 @@ Return JSON with:
 
 Return ONLY valid JSON, no markdown.`;
 
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model: MODEL_MAP.advise,
     contents: prompt,
   });
@@ -363,7 +369,7 @@ Return JSON with:
 
 Return ONLY valid JSON, no markdown.`;
 
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model: MODEL_MAP.advise,
     contents: prompt,
   });
@@ -414,7 +420,7 @@ Return JSON with:
 
 Return ONLY valid JSON, no markdown.`;
 
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model: MODEL_MAP.prioritise,
     contents: prompt,
   });
