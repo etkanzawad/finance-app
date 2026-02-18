@@ -4,11 +4,21 @@ import { NextResponse } from "next/server";
 import FirecrawlApp from "@mendable/firecrawl-js";
 import { GoogleGenAI } from "@google/genai";
 
-const firecrawl = new FirecrawlApp({
-  apiKey: process.env.FIRECRAWL_API_KEY || "",
-});
+let _firecrawl: FirecrawlApp | null = null;
+function getFirecrawl(): FirecrawlApp {
+  if (!_firecrawl) {
+    _firecrawl = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY || "" });
+  }
+  return _firecrawl;
+}
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+let _ai: GoogleGenAI | null = null;
+function getAI(): GoogleGenAI {
+  if (!_ai) {
+    _ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+  }
+  return _ai;
+}
 
 interface PriceCheckResult {
   itemId: number;
@@ -61,7 +71,7 @@ export async function POST() {
         chunk.map(async (item) => {
           try {
             // Scrape the product page with Firecrawl
-            const scrapeResult = await firecrawl.scrape(item.url!, {
+            const scrapeResult = await getFirecrawl().scrape(item.url!, {
               formats: ["markdown"],
               onlyMainContent: true,
             });
@@ -256,7 +266,7 @@ CRITICAL: Do NOT assume prices are in AUD. Detect the actual currency from the p
 
 Return ONLY valid JSON, no markdown formatting.`;
 
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model: "gemini-2.5-flash",
     contents: prompt,
   });
