@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -10,7 +10,9 @@ import {
   DollarSign,
   Heart,
   User,
+  LogOut,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const mainNavItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -53,6 +55,14 @@ function NavLink({ item, pathname }: { item: typeof mainNavItems[0]; pathname: s
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <aside className="hidden lg:flex w-64 flex-col m-3 mr-0 rounded-2xl border border-white/[0.06] bg-zinc-950">
@@ -73,9 +83,16 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Profile at bottom */}
-      <div className="border-t border-white/[0.06] px-3 py-3">
+      {/* Profile & Sign Out at bottom */}
+      <div className="border-t border-white/[0.06] px-3 py-3 space-y-1">
         <NavLink item={profileItem} pathname={pathname} />
+        <button
+          onClick={handleSignOut}
+          className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-400"
+        >
+          <LogOut className="h-[18px] w-[18px] text-zinc-500 transition-colors duration-150 group-hover:text-red-400" />
+          Sign Out
+        </button>
       </div>
     </aside>
   );

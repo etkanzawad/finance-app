@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/sidebar";
-import { PinLock } from "@/components/pin-lock";
+import { LayoutShell } from "@/components/layout-shell";
 
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,17 +32,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
         <TooltipProvider>
-          <PinLock>
-            <div className="flex h-screen">
-              <Sidebar />
-              <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-                {children}
-              </main>
-            </div>
-          </PinLock>
+          <LayoutShell>{children}</LayoutShell>
           <Toaster />
         </TooltipProvider>
       </body>
     </html>
   );
 }
+

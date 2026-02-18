@@ -2,21 +2,21 @@ import { db } from "@/lib/db";
 import { bnplPlans } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
+import { addWeeks, addMonths, format } from "date-fns";
 
 function advanceDate(dateStr: string, frequency: string): string {
-  const date = new Date(dateStr);
+  // Parse as local midnight to avoid UTC offset shifting the date
+  const date = new Date(dateStr + "T00:00:00");
   switch (frequency) {
     case "weekly":
-      date.setDate(date.getDate() + 7);
-      break;
+      return format(addWeeks(date, 1), "yyyy-MM-dd");
     case "fortnightly":
-      date.setDate(date.getDate() + 14);
-      break;
+      return format(addWeeks(date, 2), "yyyy-MM-dd");
     case "monthly":
-      date.setMonth(date.getMonth() + 1);
-      break;
+      return format(addMonths(date, 1), "yyyy-MM-dd");
+    default:
+      return format(addMonths(date, 1), "yyyy-MM-dd");
   }
-  return date.toISOString().split("T")[0];
 }
 
 export async function POST(

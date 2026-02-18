@@ -1,13 +1,26 @@
 import { db, schema } from "@/lib/db";
 import { eq, sql } from "drizzle-orm";
-import { format, addDays, addMonths, addWeeks } from "date-fns";
+import { format, addMonths, addWeeks } from "date-fns";
 
 /**
  * Processes any due income payments: credits the linked bank account,
  * creates a transaction record, and advances nextPayDate.
  * Runs automatically on dashboard load.
+ *
+ * A module-level promise prevents concurrent dashboard requests from
+ * double-crediting income if multiple requests arrive simultaneously.
  */
-export async function processIncome() {
+let _inFlight: Promise<string[]> | null = null;
+
+export function processIncome(): Promise<string[]> {
+  if (_inFlight) return _inFlight;
+  _inFlight = _processIncome().finally(() => {
+    _inFlight = null;
+  });
+  return _inFlight;
+}
+
+async function _processIncome(): Promise<string[]> {
   const today = format(new Date(), "yyyy-MM-dd");
 
   const incomes = await db.select().from(schema.income);
