@@ -226,7 +226,7 @@ export default function InsightsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-zinc-900/40 p-1 w-fit">
+      <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-zinc-900/40 p-1 w-full sm:w-fit overflow-x-auto no-scrollbar">
         {(
           [
             { id: "statements" as Tab, label: "Statements", icon: FileText },

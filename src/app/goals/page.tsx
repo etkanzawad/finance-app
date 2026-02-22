@@ -204,7 +204,7 @@ export default function GoalsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Savings Goals</h1>
           <p className="text-muted-foreground">
@@ -231,7 +231,7 @@ export default function GoalsPage() {
                   required
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Target Amount ($)</Label>
                   <Input
@@ -252,7 +252,7 @@ export default function GoalsPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Deadline (optional)</Label>
                   <Input
@@ -286,7 +286,7 @@ export default function GoalsPage() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total Saved</CardDescription>
@@ -339,7 +339,7 @@ export default function GoalsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-end gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
             <div className="flex-1 space-y-2">
               <Label>Goal</Label>
               <Select
@@ -360,7 +360,7 @@ export default function GoalsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-40 space-y-2">
+            <div className="w-full space-y-2 sm:w-40">
               <Label>Amount ($)</Label>
               <Input
                 type="number"
@@ -387,7 +387,7 @@ export default function GoalsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
           {goals.map((goal) => {
             const progress = (goal.currentAmount / goal.targetAmount) * 100;
             const remaining = goal.targetAmount - goal.currentAmount;

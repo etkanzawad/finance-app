@@ -845,7 +845,7 @@ function AccountsSection() {
                     }
                   />
                 </FormField>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField label="Statement Date (day)">
                     <Input
                       type="number"
@@ -1112,7 +1112,7 @@ function BnplSection() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField label="Spending Limit ($)">
                 <Input
                   type="number"

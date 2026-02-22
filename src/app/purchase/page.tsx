@@ -194,14 +194,14 @@ function StrategyCard({
             : "opacity-50"
       }`}
     >
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4">
+    <CardHeader>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-sm font-bold">
+            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-sm font-bold shrink-0">
               {rank}
             </span>
             <div>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex flex-wrap items-center gap-2">
                 {strategy.name}
                 {isGeminiPick && (
                   <Badge className="bg-primary/10 text-primary border-primary/20 gap-1">
@@ -219,7 +219,7 @@ function StrategyCard({
             </div>
           </div>
           {strategy.available && (
-            <div className="text-right">
+            <div className="ml-11 sm:ml-0 text-left sm:text-right">
               <div className="text-lg font-bold">
                 {formatMoney(strategy.totalCost)}
               </div>
@@ -237,7 +237,7 @@ function StrategyCard({
       </CardHeader>
       {strategy.available && (
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="flex items-center gap-2 text-sm">
               <DollarSign className="w-4 h-4 text-muted-foreground" />
               <div>

@@ -32,19 +32,17 @@ import {
   Sparkles,
   CheckCircle2,
   Timer,
+  Plus,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeftRight,
+  ChevronRight,
+  Copy,
 } from "lucide-react";
 import Link from "next/link";
 import { ShoppingCart } from "lucide-react";
 import { formatMoney, formatDateShort, getSafeToSpendColor } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "sonner";
+
 
 interface DashboardData {
   safeToSpend: {
@@ -118,20 +116,6 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedWishlistItem, setSelectedWishlistItem] = useState<string>("");
-  const [affordabilityLoading, setAffordabilityLoading] = useState(false);
-  const [affordabilityResult, setAffordabilityResult] = useState<{
-    item: { name: string; price: number };
-    advice: {
-      verdict: string;
-      headline: string;
-      explanation: string;
-      zipStrategy: string | null;
-      monthlyImpact: string;
-      warnings: string[];
-      timeframe: string;
-    };
-  } | null>(null);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -145,26 +129,6 @@ export default function DashboardPage() {
       setLoading(false);
     }
   }, []);
-
-  const handleAffordabilityCheck = useCallback(async () => {
-    if (!selectedWishlistItem) return;
-    setAffordabilityLoading(true);
-    setAffordabilityResult(null);
-    try {
-      const res = await fetch("/api/affordability-check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wishlistItemId: Number(selectedWishlistItem) }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      const result = await res.json();
-      setAffordabilityResult(result);
-    } catch {
-      toast.error("Could not get AI advice. Try again.");
-    } finally {
-      setAffordabilityLoading(false);
-    }
-  }, [selectedWishlistItem]);
 
   useEffect(() => {
     fetchDashboard();
@@ -203,99 +167,104 @@ export default function DashboardPage() {
   const bnplPayments = data.upcomingPayments.filter((p) => p.type === "bnpl");
 
   return (
-    <div className="space-y-8 pb-8">
+    <div className="space-y-6 pb-20 sm:space-y-8 lg:pb-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Your financial overview at a glance
-        </p>
-      </div>
+      {/* Combined Header & Balance Card */}
+      <div className="relative overflow-hidden rounded-[32px] border border-white/[0.08] bg-zinc-900 p-6 sm:p-8">
+        {/* Background Gradients */}
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 h-80 w-80 rounded-full bg-[#c4f441]/[0.05] blur-[80px]" />
+        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-80 w-80 rounded-full bg-violet-500/[0.05] blur-[80px]" />
+        
+        <div className="relative">
+          {/* Top Row: Profile & Notifications */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="relative h-12 w-12 overflow-hidden rounded-full border border-white/[0.1] bg-zinc-800 shadow-xl">
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#c4f441] to-emerald-500 text-lg font-bold text-black">
+                  EZ
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-zinc-400">Welcome Back!</span>
+                <h1 className="text-xl font-bold tracking-tight text-white">Etkan Zawad</h1>
+              </div>
+            </div>
+            <button className="relative rounded-full border border-white/[0.08] bg-white/[0.03] p-3 text-zinc-400 transition-colors hover:bg-white/[0.08] hover:text-white">
+              <span className="absolute top-3 right-3.5 h-1.5 w-1.5 rounded-full bg-red-500 ring-2 ring-[#09090b]" />
+              <div className="h-5 w-5">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                </svg>
+              </div>
+            </button>
+          </div>
 
-      {/* Safe to Spend Hero */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 p-8">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-[#c4f441]/[0.07] via-transparent to-violet-500/[0.04]" />
-        <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-[#c4f441]/[0.03] blur-3xl" />
-        <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-violet-500/[0.04] blur-3xl" />
-        <div className="relative flex flex-col items-center text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3.5 py-1.5 text-xs font-medium text-zinc-400 backdrop-blur-sm">
-            <Wallet className="h-3.5 w-3.5" />
-            Safe to Spend
-          </div>
-          <p className={`mt-5 text-6xl font-bold tracking-tighter sm:text-7xl ${stsColor}`}>
-            {formatMoney(sts.safeToSpend)}
-          </p>
-          <div className="mt-4 flex items-center gap-3 text-sm text-zinc-500">
-            <div className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5" />
-              <span>
-                {sts.daysUntilPay} {sts.daysUntilPay === 1 ? "day" : "days"} until payday
-              </span>
+          {/* Middle Row: Balance */}
+          <div className="mt-8">
+            <div className="flex items-baseline gap-3">
+              <h2 className="text-5xl font-bold tracking-tighter text-white sm:text-6xl">
+                 {formatMoney(data.netPosition)}
+              </h2>
+              <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-sm font-medium text-emerald-400">
+                <ArrowUpRight className="h-3.5 w-3.5" />
+                <span>11.5%</span>
+              </div>
             </div>
-            <span className="h-1 w-1 rounded-full bg-zinc-700" />
-            <span>{formatDateShort(sts.nextPayDate)}</span>
-          </div>
-          {sts.daysUntilPay > 0 && (
-            <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-white/[0.04] px-2.5 py-1 text-xs text-zinc-500">
-              <Banknote className="h-3 w-3" />
-              ~{formatMoney(Math.round(sts.safeToSpend / sts.daysUntilPay))}/day
+            
+            {/* Expandable Breakdown */}
+            <div className="mt-6 border-t border-white/[0.08] pt-4">
+              <details className="group">
+                <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium text-zinc-400 marker:content-none hover:text-white">
+                  <span className="flex-1">View Breakdown</span>
+                  <div className="rounded-full bg-white/[0.04] p-1 transition-transform group-open:rotate-180">
+                    <ChevronRight className="h-3.5 w-3.5 rotate-90" />
+                  </div>
+                </summary>
+                
+                <div className="mt-4 space-y-3 text-sm">
+                  <div className="flex justify-between text-zinc-500">
+                    <span>Available (savings)</span>
+                    <span className="font-medium text-emerald-400/80">
+                      {formatMoney(data.availableBalance)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-zinc-500">
+                    <span>Bills account</span>
+                    <span className="font-medium text-emerald-400/80">
+                      {formatMoney(data.expenseAccountBalance)}
+                    </span>
+                  </div>
+                  {data.totalCreditCardDebt > 0 && (
+                    <div className="flex justify-between text-zinc-500">
+                      <span>Credit cards</span>
+                      <span className="font-medium text-red-400/80">
+                        -{formatMoney(data.totalCreditCardDebt)}
+                      </span>
+                    </div>
+                  )}
+                  {data.totalBnplDebt > 0 && (
+                    <div className="flex justify-between text-zinc-500">
+                      <span>BNPL remaining</span>
+                      <span className="font-medium text-red-400/80">
+                        -{formatMoney(data.totalBnplDebt)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </details>
             </div>
-          )}
+          </div>
         </div>
       </div>
-
-      {/* Net Position */}
-      <Card className="border-white/[0.06] bg-zinc-900/60 backdrop-blur-sm">
-        <CardHeader className="pb-3">
-          <CardDescription className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-zinc-500">
-            {data.netPosition >= 0 ? (
-              <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-            ) : (
-              <TrendingDown className="h-3.5 w-3.5 text-red-500" />
-            )}
-            Net Position
-          </CardDescription>
-          <CardTitle
-            className={`text-3xl font-bold tracking-tight ${
-              data.netPosition >= 0 ? "text-emerald-400" : "text-red-400"
-            }`}
-          >
-            {formatMoney(data.netPosition)}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between text-zinc-500">
-              <span>Available (savings)</span>
-              <span className="font-medium text-emerald-400/80">
-                {formatMoney(data.availableBalance)}
-              </span>
-            </div>
-            <div className="flex justify-between text-zinc-500">
-              <span>Bills account</span>
-              <span className="font-medium text-emerald-400/80">
-                {formatMoney(data.expenseAccountBalance)}
-              </span>
-            </div>
-            {data.totalCreditCardDebt > 0 && (
-              <div className="flex justify-between text-zinc-500">
-                <span>Credit cards</span>
-                <span className="font-medium text-red-400/80">
-                  -{formatMoney(data.totalCreditCardDebt)}
-                </span>
-              </div>
-            )}
-            {data.totalBnplDebt > 0 && (
-              <div className="flex justify-between text-zinc-500">
-                <span>BNPL remaining</span>
-                <span className="font-medium text-red-400/80">
-                  -{formatMoney(data.totalBnplDebt)}
-                </span>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Account Balances */}
       <div>
@@ -479,8 +448,8 @@ export default function DashboardPage() {
                 </p>
               </div>
             ) : (
-              <div className="flex items-center gap-6">
-                <div className="h-44 w-44 shrink-0">
+              <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                <div className="h-44 w-full sm:w-44 shrink-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -546,188 +515,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Wishlist Summary */}
-      {data.wishlistSummary.itemCount > 0 && (
-        <Card className="border-white/[0.06] bg-zinc-900/60 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2.5 text-base font-semibold">
-              <div className="rounded-lg bg-pink-500/10 p-1.5">
-                <Heart className="h-4 w-4 text-pink-400" />
-              </div>
-              Wishlist
-            </CardTitle>
-            <CardDescription className="text-zinc-600">
-              {data.wishlistSummary.itemCount} item{data.wishlistSummary.itemCount !== 1 ? "s" : ""} &middot;{" "}
-              {formatMoney(data.wishlistSummary.totalValue)} total
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1">
-              {data.wishlistSummary.topItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between rounded-lg px-3 py-3 transition-colors hover:bg-white/[0.02]"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-pink-500/10">
-                      <Heart className="h-4 w-4 text-pink-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">{item.name}</p>
-                      <p className="mt-0.5 text-xs capitalize text-zinc-600">{item.status}</p>
-                    </div>
-                  </div>
-                  <span className="text-sm font-semibold tabular-nums text-zinc-300">{formatMoney(item.price)}</span>
-                </div>
-              ))}
-            </div>
-            <Link
-              href="/wishlist"
-              className="mt-4 flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] py-2 text-xs font-medium text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-300"
-            >
-              View full wishlist
-              <ArrowUpRight className="h-3 w-3" />
-            </Link>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* AI Affordability Advisor */}
-      {data.wishlistSummary.itemCount > 0 && (
-        <Card className="border-white/[0.06] bg-zinc-900/60 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2.5 text-base font-semibold">
-              <div className="rounded-lg bg-cyan-500/10 p-1.5">
-                <Sparkles className="h-4 w-4 text-cyan-400" />
-              </div>
-              AI Affordability Advisor
-            </CardTitle>
-            <CardDescription className="text-zinc-600">
-              Select a wishlist item to check if you can afford it
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-3">
-              <Select
-                value={selectedWishlistItem}
-                onValueChange={(val) => {
-                  setSelectedWishlistItem(val);
-                  setAffordabilityResult(null);
-                }}
-              >
-                <SelectTrigger className="flex-1 border-white/[0.08] bg-white/[0.03]">
-                  <SelectValue placeholder="Choose a wishlist item..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {data.wishlistSummary.topItems.map((item) => (
-                    <SelectItem key={item.id} value={String(item.id)}>
-                      {item.name} — {formatMoney(item.price)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                onClick={handleAffordabilityCheck}
-                disabled={!selectedWishlistItem || affordabilityLoading}
-                className="bg-[#c4f441] text-zinc-900 hover:bg-[#d4ff51] disabled:opacity-40"
-              >
-                {affordabilityLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <Sparkles className="mr-1.5 h-4 w-4" />
-                    Ask AI
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {affordabilityResult && (
-              <div className="space-y-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-                {/* Verdict badge */}
-                <div className="flex items-center gap-3">
-                  <Badge
-                    variant="secondary"
-                    className={`border-0 text-xs font-semibold ${
-                      affordabilityResult.advice.verdict === "yes_cash"
-                        ? "bg-emerald-500/15 text-emerald-400"
-                        : affordabilityResult.advice.verdict === "yes_zip"
-                        ? "bg-cyan-500/15 text-cyan-400"
-                        : affordabilityResult.advice.verdict === "yes_save_short"
-                        ? "bg-amber-500/15 text-amber-400"
-                        : "bg-red-500/15 text-red-400"
-                    }`}
-                  >
-                    {affordabilityResult.advice.verdict === "yes_cash" && (
-                      <><CheckCircle2 className="mr-1 h-3 w-3" />Affordable (Cash)</>
-                    )}
-                    {affordabilityResult.advice.verdict === "yes_zip" && (
-                      <><CheckCircle2 className="mr-1 h-3 w-3" />Affordable (Zip Pay)</>
-                    )}
-                    {affordabilityResult.advice.verdict === "yes_save_short" && (
-                      <><Timer className="mr-1 h-3 w-3" />Save Up (Short Term)</>
-                    )}
-                    {affordabilityResult.advice.verdict === "not_yet" && (
-                      <><AlertCircle className="mr-1 h-3 w-3" />Not Yet</>
-                    )}
-                  </Badge>
-                  <span className="text-xs text-zinc-500">
-                    {affordabilityResult.advice.timeframe}
-                  </span>
-                </div>
-
-                {/* Headline */}
-                <p className="text-base font-semibold text-zinc-200">
-                  {affordabilityResult.advice.headline}
-                </p>
-
-                {/* Explanation */}
-                <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-400">
-                  {affordabilityResult.advice.explanation}
-                </p>
-
-                {/* Zip Strategy */}
-                {affordabilityResult.advice.zipStrategy && (
-                  <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/[0.06] p-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-cyan-400">
-                      <CreditCard className="h-4 w-4" />
-                      Zip Pay Strategy
-                    </div>
-                    <p className="mt-2 text-sm text-zinc-400">
-                      {affordabilityResult.advice.zipStrategy}
-                    </p>
-                  </div>
-                )}
-
-                {/* Monthly Impact */}
-                <div className="flex items-center gap-2 text-sm text-zinc-400">
-                  <Banknote className="h-4 w-4 text-zinc-500" />
-                  <span>
-                    <span className="font-medium text-zinc-300">Monthly impact:</span>{" "}
-                    {affordabilityResult.advice.monthlyImpact}
-                  </span>
-                </div>
-
-                {/* Warnings */}
-                {affordabilityResult.advice.warnings.length > 0 && (
-                  <div className="space-y-1.5">
-                    {affordabilityResult.advice.warnings.map((warning, i) => (
-                      <div
-                        key={i}
-                        className="flex items-start gap-2 text-xs text-amber-400/80"
-                      >
-                        <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
-                        <span>{warning}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

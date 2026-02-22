@@ -8,15 +8,16 @@ function getAI(): GoogleGenAI {
   return _ai;
 }
 
-export type TaskType = "categorise" | "advise" | "report" | "cleanup" | "prioritise" | "parse";
+export type TaskType = "categorise" | "advise" | "report" | "cleanup" | "prioritise" | "parse" | "parse_image";
 
 const MODEL_MAP: Record<TaskType, string> = {
-  categorise: "gemini-2.5-flash",
-  cleanup: "gemini-2.5-flash",
-  advise: "gemini-2.5-pro",
-  report: "gemini-2.5-pro",
-  prioritise: "gemini-2.5-pro",
-  parse: "gemini-2.5-pro",
+  categorise: "gemini-3-flash-preview",
+  cleanup: "gemini-3-flash-preview",
+  advise: "gemini-3.1-pro-preview",
+  report: "gemini-3.1-pro-preview",
+  prioritise: "gemini-3.1-pro-preview",
+  parse: "gemini-3.1-pro-preview",
+  parse_image: "gemini-3-flash-preview",
 };
 
 export interface CategorisationResult {
@@ -59,11 +60,11 @@ Return ONLY valid JSON array, no markdown formatting.`;
   const response = await getAI().models.generateContent({
     model: MODEL_MAP.categorise,
     contents: prompt,
+    config: { responseMimeType: "application/json" },
   });
 
   const text = response.text || "";
-  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  return JSON.parse(cleaned);
+  return JSON.parse(text);
 }
 
 export async function getPurchaseAdvice(context: {
@@ -106,11 +107,11 @@ Return ONLY valid JSON, no markdown.`;
   const response = await getAI().models.generateContent({
     model: MODEL_MAP.advise,
     contents: prompt,
+    config: { responseMimeType: "application/json" },
   });
 
   const text = response.text || "";
-  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  return JSON.parse(cleaned);
+  return JSON.parse(text);
 }
 
 export async function generateMonthlyReport(context: {
@@ -157,11 +158,11 @@ Return ONLY valid JSON, no markdown.`;
   const response = await getAI().models.generateContent({
     model: MODEL_MAP.report,
     contents: prompt,
+    config: { responseMimeType: "application/json" },
   });
 
   const text = response.text || "";
-  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  return JSON.parse(cleaned);
+  return JSON.parse(text);
 }
 
 export interface BnplAdvisorResult {
@@ -260,11 +261,13 @@ Return ONLY valid JSON, no markdown.`;
   const response = await getAI().models.generateContent({
     model: MODEL_MAP.advise,
     contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+    },
   });
 
   const text = response.text || "";
-  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  return JSON.parse(cleaned);
+  return JSON.parse(text);
 }
 
 export interface AffordabilityAdvice {
@@ -373,11 +376,11 @@ Return ONLY valid JSON, no markdown.`;
   const response = await getAI().models.generateContent({
     model: MODEL_MAP.advise,
     contents: prompt,
+    config: { responseMimeType: "application/json" },
   });
 
   const text = response.text || "";
-  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  return JSON.parse(cleaned);
+  return JSON.parse(text);
 }
 
 export interface PdfParsedTransaction {
@@ -454,11 +457,60 @@ Return ONLY a valid JSON array of all transactions. No markdown, no explanation,
         ],
       },
     ],
+    config: { responseMimeType: "application/json" },
   });
 
   const text = response.text || "";
-  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  return JSON.parse(cleaned);
+  return JSON.parse(text);
+}
+
+export interface BnplScreenshotData {
+  totalAmount: number | null;
+  instalmentAmount: number | null;
+  instalmentsTotal: number | null;
+  instalmentsRemaining: number | null;
+  nextPaymentDate: string | null; // YYYY-MM-DD
+  instalmentFrequency: "weekly" | "fortnightly" | "monthly" | null;
+}
+
+export async function parseBnplScreenshot(
+  imageBase64: string,
+  mimeType: string
+): Promise<BnplScreenshotData> {
+  const prompt = `You are analysing a Buy Now Pay Later (BNPL) app screenshot (e.g. Afterpay, Zip, PayPal Pay in 4, Laybuy, Humm).
+
+Extract the following fields and return them as JSON:
+- "totalAmount": the total purchase/order amount in dollars (e.g. 209.99). null if not visible.
+- "instalmentAmount": the amount per instalment in dollars. Use the most common/typical instalment (not a rounding adjustment). null if not visible.
+- "instalmentsTotal": total number of instalments (e.g. 4). null if not visible.
+- "instalmentsRemaining": number of instalments NOT yet paid. null if not visible.
+- "nextPaymentDate": the date of the next upcoming payment in YYYY-MM-DD format. null if not visible or all paid.
+- "instalmentFrequency": one of "weekly", "fortnightly", or "monthly". Infer from the dates between payments if shown (e.g. ~7 days = weekly, ~14 days = fortnightly, ~30 days = monthly). null if cannot be determined.
+
+Rules:
+- Dollar amounts should be numbers without the $ symbol (e.g. 52.50, not "$52.50")
+- For "instalmentsRemaining", count only payments NOT yet marked as paid/completed
+- For "nextPaymentDate", look for labels like "Next payment", "Due", or the first unpaid item in the schedule
+- The current year context: assume dates without a year are in the near future based on the payment schedule shown
+
+Return ONLY valid JSON, no markdown, no explanation.`;
+
+  const response = await getAI().models.generateContent({
+    model: MODEL_MAP.parse_image,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { inlineData: { mimeType, data: imageBase64 } },
+          { text: prompt },
+        ],
+      },
+    ],
+    config: { responseMimeType: "application/json" },
+  });
+
+  const text = response.text || "";
+  return JSON.parse(text);
 }
 
 export interface WishlistPrioritisation {
@@ -505,9 +557,9 @@ Return ONLY valid JSON, no markdown.`;
   const response = await getAI().models.generateContent({
     model: MODEL_MAP.prioritise,
     contents: prompt,
+    config: { responseMimeType: "application/json" },
   });
 
   const text = response.text || "";
-  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  return JSON.parse(cleaned);
+  return JSON.parse(text);
 }

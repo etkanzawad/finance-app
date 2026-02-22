@@ -482,7 +482,7 @@ export default function WishlistPage() {
                     required
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-zinc-400">Price ($)</Label>
                     <Input
@@ -514,7 +514,7 @@ export default function WishlistPage() {
                     className="border-white/[0.08] bg-white/[0.03] placeholder:text-zinc-700 focus-visible:ring-[#c4f441]/30"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-zinc-400">Priority</Label>
                     <Select value={formPriority} onValueChange={setFormPriority}>
@@ -569,7 +569,7 @@ export default function WishlistPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-pink-500/[0.07] via-transparent to-violet-500/[0.04]" />
         <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-pink-500/[0.03] blur-3xl" />
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-violet-500/[0.04] blur-3xl" />
-        <div className="relative grid gap-8 sm:grid-cols-3">
+        <div className="relative grid gap-6 grid-cols-1 sm:grid-cols-3">
           <div className="text-center sm:text-left">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3.5 py-1.5 text-xs font-medium text-zinc-400 backdrop-blur-sm">
               <Heart className="h-3.5 w-3.5 text-pink-400" />
@@ -627,7 +627,7 @@ export default function WishlistPage() {
       {/* AI BNPL Advisor */}
       <Card className="border-white/[0.06] bg-zinc-900/60 backdrop-blur-sm">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="rounded-xl bg-gradient-to-br from-[#c4f441]/20 to-[#c4f441]/5 p-2.5">
                 <Bot className="h-5 w-5 text-[#c4f441]" />
@@ -639,7 +639,7 @@ export default function WishlistPage() {
                 </CardDescription>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               {bnplAdvisor && (
                 <Button
                   variant="ghost"
@@ -653,7 +653,7 @@ export default function WishlistPage() {
               <Button
                 onClick={handleBnplAdvisor}
                 disabled={bnplAdvisorLoading || activeItems.length === 0}
-                className="bg-[#c4f441] font-semibold text-zinc-900 hover:bg-[#d4ff51] active:bg-[#b4e431]"
+                className="flex-1 sm:flex-none bg-[#c4f441] font-semibold text-zinc-900 hover:bg-[#d4ff51] active:bg-[#b4e431]"
               >
                 {bnplAdvisorLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -991,7 +991,7 @@ export default function WishlistPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
           {filteredItems.map((item) => {
             const goalProgress =
               item.linkedGoalId && item.goalTargetAmount
@@ -1168,6 +1168,17 @@ export default function WishlistPage() {
                           Archive
                         </Button>
                       </>
+                    )}
+                    {item.status === "archived" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 border-white/[0.08] bg-white/[0.03] text-xs text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
+                        onClick={() => handleStatusChange(item.id, "wanted")}
+                      >
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Unarchive
+                      </Button>
                     )}
                     <Button
                       variant="ghost"

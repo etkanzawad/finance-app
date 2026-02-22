@@ -1,0 +1,17 @@
+/Users/etkanzawad/Documents/GitHub/finance-app/src/lib/db/index.ts:7
+  throw new Error("DATABASE_URL environment variable is not set");
+        ^
+
+Error: DATABASE_URL environment variable is not set
+    at postgres (/Users/etkanzawad/Documents/GitHub/finance-app/src/lib/db/index.ts:7:9)
+    at Object.<anonymous> (/Users/etkanzawad/Documents/GitHub/finance-app/src/lib/db/index.ts:12:45)
+    at Module._compile (node:internal/modules/cjs/loader:1803:14)
+    at Object.transformer (/Users/etkanzawad/Documents/GitHub/finance-app/node_modules/tsx/dist/register-D46fvsV_.cjs:3:1104)
+    at Module.load (node:internal/modules/cjs/loader:1524:32)
+    at Module._load (node:internal/modules/cjs/loader:1326:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1547:12)
+    at require (node:internal/modules/helpers:152:16)
+
+Node.js v25.5.0

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -49,6 +49,8 @@ import {
   Wallet,
   CheckCircle2,
   Banknote,
+  ScanLine,
+  ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -127,6 +129,11 @@ export default function BnplPage() {
   const [formInstalmentsRemaining, setFormInstalmentsRemaining] = useState("");
   const [formNextPaymentDate, setFormNextPaymentDate] = useState("");
 
+  // Screenshot scan state
+  const [imageParseLoading, setImageParseLoading] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const fetchData = useCallback(async () => {
     try {
       const [plansRes] = await Promise.all([
@@ -162,6 +169,41 @@ export default function BnplPage() {
     setFormInstalmentsRemaining("");
     setFormNextPaymentDate("");
     setEditingPlan(null);
+    setImagePreview(null);
+    setImageParseLoading(false);
+  }
+
+  async function handleImageParse(file: File) {
+    setImageParseLoading(true);
+    setImagePreview(URL.createObjectURL(file));
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/bnpl-plans/parse-screenshot", {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) throw new Error("Parse failed");
+      const data = await res.json();
+      if (data.totalAmount != null) setFormTotalAmount(String(data.totalAmount));
+      if (data.instalmentAmount != null) setFormInstalmentAmount(String(data.instalmentAmount));
+      if (data.instalmentsTotal != null) setFormInstalmentsTotal(String(data.instalmentsTotal));
+      if (data.instalmentsRemaining != null) setFormInstalmentsRemaining(String(data.instalmentsRemaining));
+      if (data.nextPaymentDate != null) setFormNextPaymentDate(data.nextPaymentDate);
+      if (data.instalmentFrequency != null) setFormFrequency(data.instalmentFrequency);
+      toast.success("Form pre-filled from screenshot");
+    } catch {
+      toast.error("Could not read screenshot — fill in manually");
+    } finally {
+      setImageParseLoading(false);
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    const imageFile = Array.from(e.clipboardData.items)
+      .find((item) => item.type.startsWith("image/"))
+      ?.getAsFile();
+    if (imageFile) handleImageParse(imageFile);
   }
 
   function openEdit(plan: BnplPlan) {
@@ -393,7 +435,7 @@ export default function BnplPage() {
   return (
     <div className="space-y-8 pb-8">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">BNPL Tracker</h1>
           <p className="mt-1 text-sm text-zinc-500">
@@ -418,7 +460,51 @@ export default function BnplPage() {
                 {editingPlan ? "Edit Plan" : "Add BNPL Plan"}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} onPaste={handlePaste} className="space-y-4">
+              {/* Screenshot scan zone */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImageParse(file);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full rounded-lg border border-dashed border-white/[0.12] bg-white/[0.02] p-4 text-center transition-colors hover:border-[#c4f441]/30 hover:bg-[#c4f441]/[0.03] active:bg-[#c4f441]/[0.06]"
+              >
+                {imageParseLoading ? (
+                  <div className="flex items-center justify-center gap-2 text-sm text-zinc-400">
+                    <Loader2 className="h-4 w-4 animate-spin text-[#c4f441]" />
+                    Scanning screenshot…
+                  </div>
+                ) : imagePreview ? (
+                  <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imagePreview}
+                      alt="Screenshot preview"
+                      className="h-14 w-auto rounded object-contain"
+                    />
+                    <div className="text-left">
+                      <p className="text-xs font-medium text-[#c4f441]">Screenshot scanned</p>
+                      <p className="text-xs text-zinc-500">Tap to scan a different one</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-1.5">
+                    <ScanLine className="h-5 w-5 text-zinc-600" />
+                    <p className="text-sm font-medium text-zinc-400">Scan BNPL screenshot</p>
+                    <p className="text-xs text-zinc-600">Tap to choose from photos</p>
+                  </div>
+                )}
+              </button>
+
               <div className="space-y-2">
                 <Label className="text-zinc-400">BNPL Account</Label>
                 <Select value={formAccountId} onValueChange={setFormAccountId}>
@@ -444,7 +530,7 @@ export default function BnplPage() {
                   required
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-zinc-400">Total Amount ($)</Label>
                   <Input
@@ -481,7 +567,7 @@ export default function BnplPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-zinc-400">Total Instalments</Label>
                   <Input
@@ -531,7 +617,7 @@ export default function BnplPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-500/[0.07] via-transparent to-red-500/[0.04]" />
         <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-amber-500/[0.03] blur-3xl" />
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-red-500/[0.04] blur-3xl" />
-        <div className="relative grid gap-8 sm:grid-cols-3">
+        <div className="relative grid gap-6 grid-cols-1 sm:grid-cols-3">
           <div className="text-center sm:text-left">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3.5 py-1.5 text-xs font-medium text-zinc-400 backdrop-blur-sm">
               <ShieldAlert className="h-3.5 w-3.5 text-amber-400" />
@@ -660,7 +746,7 @@ export default function BnplPage() {
       {/* Payment Calendar */}
       <Card className="border-white/[0.06] bg-zinc-900/60 backdrop-blur-sm">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="rounded-xl bg-gradient-to-br from-[#c4f441]/20 to-[#c4f441]/5 p-2.5">
                 <CalendarDays className="h-5 w-5 text-[#c4f441]" />
@@ -674,7 +760,7 @@ export default function BnplPage() {
                 </CardDescription>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
               <Button
                 variant="outline"
                 size="sm"

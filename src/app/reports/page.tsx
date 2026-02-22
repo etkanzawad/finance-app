@@ -142,7 +142,7 @@ export default function ReportsPage() {
 
       {/* Month Selector */}
       <Card>
-        <CardContent className="flex items-center gap-4 pt-6">
+        <CardContent className="flex flex-wrap items-center gap-3 pt-6">
           <Button variant="outline" size="icon" onClick={() => navigateMonth(-1)}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -199,7 +199,7 @@ export default function ReportsPage() {
       {reportData && (
         <>
           {/* Key Metrics */}
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
@@ -250,7 +250,7 @@ export default function ReportsPage() {
           </div>
 
           {/* Charts */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle>Income vs Expenses</CardTitle>
@@ -394,7 +394,7 @@ export default function ReportsPage() {
                 </CardContent>
               </Card>
 
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
                 {/* Highlights */}
                 <Card>
                   <CardHeader>
