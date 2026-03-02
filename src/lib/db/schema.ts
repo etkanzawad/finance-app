@@ -118,6 +118,14 @@ export const settings = pgTable("settings", {
   value: text("value").notNull(), // JSON string
 });
 
+export const conversations = pgTable("conversations", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  messages: text("messages").notNull(), // JSON stringified message array
+  createdAt: text("created_at").notNull().default(sql`now()`),
+  updatedAt: text("updated_at").notNull().default(sql`now()`),
+});
+
 // Type exports
 export type Income = typeof income.$inferSelect;
 export type NewIncome = typeof income.$inferInsert;
@@ -138,3 +146,5 @@ export type NewMerchantMapping = typeof merchantMappings.$inferInsert;
 export type WishlistItem = typeof wishlistItems.$inferSelect;
 export type NewWishlistItem = typeof wishlistItems.$inferInsert;
 export type Setting = typeof settings.$inferSelect;
+export type Conversation = typeof conversations.$inferSelect;
+export type NewConversation = typeof conversations.$inferInsert;
