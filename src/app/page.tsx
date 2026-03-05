@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, FormEvent, Suspense } from "react";
+
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Send,
@@ -12,7 +13,7 @@ import {
   PiggyBank,
   CircleDollarSign,
   CreditCard,
-  RotateCcw,
+  SquarePen,
   Tag,
   Paperclip,
   X,
@@ -179,6 +180,10 @@ function serializeForSave(msgs: Message[]) {
   }));
 }
 
+// Module-level: survives component remounts caused by Next.js soft navigation
+// when window.history.replaceState updates the URL after a new conversation is saved.
+let _justCreatedConvId: string | null = null;
+
 // ── Inner component (needs useSearchParams inside Suspense) ──
 function DashboardInner() {
   const searchParams = useSearchParams();
@@ -218,6 +223,12 @@ function DashboardInner() {
   useEffect(() => {
     if (!chatId) {
       setConversationId(null);
+      return;
+    }
+    // If we just created this conversation ourselves, skip the DB fetch —
+    // the messages are already in state (with ui_components intact).
+    if (_justCreatedConvId === chatId) {
+      _justCreatedConvId = null;
       return;
     }
     let cancelled = false;
@@ -351,6 +362,8 @@ function DashboardInner() {
         if (createRes.ok) {
           const created = await createRes.json();
           setConversationId(created.id);
+          // Mark this ID so the chatId effect skips re-fetching (messages already in state)
+          _justCreatedConvId = String(created.id);
           // Update URL without full navigation
           window.history.replaceState(null, "", `/?chat=${created.id}`);
         }
@@ -458,10 +471,10 @@ function DashboardInner() {
       onDrop={handleDrop}
     >
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto relative">
+      <div className="flex-1 overflow-y-auto relative min-h-0">
         {isWelcome ? (
           /* ── Welcome Screen ── */
-          <div className="flex h-full flex-col items-center justify-center px-4 py-6 overflow-y-auto">
+          <div className="flex h-full flex-col items-center justify-center px-4 py-6 overflow-y-auto min-h-0">
             {/* Logo / Greeting */}
             <div className="relative mb-6">
               <div className="absolute -inset-4 rounded-full bg-[#c4f441]/[0.08] blur-2xl" />
@@ -538,17 +551,24 @@ function DashboardInner() {
           </div>
         ) : (
           /* ── Chat Messages ── */
-          <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 pb-4">
+          <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6 pb-4">
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                className={`flex w-full flex-col gap-1 ${
+                  msg.role === "user" ? "items-end" : "items-start"
+                }`}
               >
+                {/* Sender label */}
+                <span className="px-1 text-[10px] font-medium tracking-wide text-zinc-600">
+                  {msg.role === "user" ? "You" : "Mint ✦"}
+                </span>
+
                 <div
-                  className={`max-w-[85%] sm:max-w-[75%] ${
+                  className={`min-w-0 break-words ${
                     msg.role === "user"
-                      ? "rounded-2xl rounded-br-md bg-[#c4f441] px-4 py-3 text-sm text-black"
-                      : "rounded-2xl rounded-bl-md border border-white/[0.06] bg-zinc-900/80 px-5 py-4"
+                      ? "max-w-[85%] sm:max-w-[72%] rounded-2xl rounded-br-sm bg-[#c4f441] px-4 py-3 text-sm text-black"
+                      : "w-full rounded-2xl rounded-tl-sm border border-white/[0.06] bg-zinc-900/80 px-5 py-4"
                   }`}
                 >
                   {msg.role === "user" ? (
@@ -590,8 +610,9 @@ function DashboardInner() {
 
             {/* Loading indicator */}
             {isLoading && (
-              <div className="flex justify-start">
-                <div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-white/[0.06] bg-zinc-900/80 px-5 py-4">
+              <div className="flex w-full flex-col items-start gap-1">
+                <span className="px-1 text-[10px] font-medium tracking-wide text-zinc-600">Mint ✦</span>
+                <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-white/[0.06] bg-zinc-900/80 px-5 py-4">
                   <div className="flex gap-1">
                     <span className="h-2 w-2 animate-bounce rounded-full bg-[#c4f441]/60 [animation-delay:0ms]" />
                     <span className="h-2 w-2 animate-bounce rounded-full bg-[#c4f441]/60 [animation-delay:150ms]" />
@@ -661,17 +682,16 @@ function DashboardInner() {
           )}
 
           <form onSubmit={handleSubmit} className="flex items-center gap-2">
-            {/* New chat / clear button */}
-            {messages.length > 0 && (
-              <button
-                type="button"
-                onClick={handleClear}
-                className="shrink-0 rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-zinc-600 transition-colors hover:bg-white/[0.06] hover:text-zinc-400"
-                title="New chat"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </button>
-            )}
+            {/* New chat button — always visible */}
+            <button
+              type="button"
+              onClick={handleClear}
+              disabled={messages.length === 0 && !conversationId}
+              className="shrink-0 rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-zinc-600 transition-colors hover:bg-white/[0.06] hover:text-zinc-400 disabled:opacity-25 disabled:cursor-not-allowed"
+              title="New chat"
+            >
+              <SquarePen className="h-4 w-4" />
+            </button>
 
             {/* Attach file button */}
             <button
