@@ -21,7 +21,9 @@ import {
   Key,
   Cpu,
   Loader2,
+  FileText,
 } from "lucide-react";
+import { BnplAgreementUpload } from "@/components/bnpl/BnplAgreementUpload";
 
 // ---- AI Settings ----
 
@@ -295,9 +297,33 @@ function DataManagementSection() {
   );
 }
 
+// ---- BNPL Agreements ----
+
+function BnplSettingsSection() {
+  return (
+    <div className="space-y-5">
+      <div className="rounded-xl border border-white/[0.06] bg-zinc-900/60 p-5 backdrop-blur-sm">
+        <div className="flex items-center gap-2.5 text-sm font-medium text-zinc-400">
+          <div className="rounded-lg bg-amber-500/10 p-1.5">
+            <FileText className="h-3.5 w-3.5 text-amber-400" />
+          </div>
+          Upload BNPL Agreement
+        </div>
+        <p className="mt-1.5 text-xs text-zinc-600">
+          Upload Buy Now Pay Later agreement documents for record-keeping.
+          Files are stored securely in your Supabase storage.
+        </p>
+        <div className="mt-4">
+          <BnplAgreementUpload />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- Settings Tabs ----
 
-type SettingsTab = "ai" | "data";
+type SettingsTab = "ai" | "data" | "bnpl";
 
 const TABS: {
   id: SettingsTab;
@@ -307,6 +333,7 @@ const TABS: {
 }[] = [
   { id: "ai", label: "AI", icon: Brain, accent: "text-violet-400" },
   { id: "data", label: "Data", icon: Database, accent: "text-emerald-400" },
+  { id: "bnpl", label: "BNPL", icon: FileText, accent: "text-amber-400" },
 ];
 
 export default function SettingsPage() {
@@ -348,6 +375,7 @@ export default function SettingsPage() {
       <div>
         {activeTab === "ai" && <AiSettingsSection />}
         {activeTab === "data" && <DataManagementSection />}
+        {activeTab === "bnpl" && <BnplSettingsSection />}
       </div>
     </div>
   );

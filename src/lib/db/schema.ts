@@ -126,6 +126,18 @@ export const conversations = pgTable("conversations", {
   updatedAt: text("updated_at").notNull().default(sql`now()`),
 });
 
+export const bnplAgreements = pgTable("bnpl_agreements", {
+  id: serial("id").primaryKey(),
+  provider: text("provider").notNull().$type<"afterpay" | "zip_pay" | "zip_money" | "paypal_pay4">(),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size").notNull(),
+  storagePath: text("storage_path").notNull(),
+  publicUrl: text("public_url").notNull(),
+  extractedText: text("extracted_text"),
+  notes: text("notes"),
+  createdAt: text("created_at").notNull().default(sql`now()`),
+});
+
 // Type exports
 export type Income = typeof income.$inferSelect;
 export type NewIncome = typeof income.$inferInsert;
@@ -148,3 +160,5 @@ export type NewWishlistItem = typeof wishlistItems.$inferInsert;
 export type Setting = typeof settings.$inferSelect;
 export type Conversation = typeof conversations.$inferSelect;
 export type NewConversation = typeof conversations.$inferInsert;
+export type BnplAgreement = typeof bnplAgreements.$inferSelect;
+export type NewBnplAgreement = typeof bnplAgreements.$inferInsert;
