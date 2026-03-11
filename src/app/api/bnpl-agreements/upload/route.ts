@@ -3,7 +3,6 @@ import { bnplAgreements } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { PDFParse } from "pdf-parse";
 
 // Valid BNPL providers
 const VALID_PROVIDERS = ["afterpay", "zip_pay", "zip_money", "paypal_pay4"] as const;
@@ -129,17 +128,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Extract text from file
+    // Extract text from file (best-effort)
     let extractedText: string | null = null;
     try {
       if (isMdExt || isTxtExt) {
         extractedText = fileBuffer.toString('utf-8');
-      } else if (isPdfExt) {
-        const parser = new PDFParse({ data: new Uint8Array(fileBuffer) });
-        const textResult = await parser.getText();
-        extractedText = textResult.text?.trim() || null;
-        parser.destroy();
       }
+      // PDF text extraction skipped - requires pdf-parse package
+      // TODO: Add pdf-parse dependency if PDF text search is needed
     } catch (extractError) {
       console.error("Error extracting text:", extractError);
       // Upload still succeeds — text extraction is best-effort
