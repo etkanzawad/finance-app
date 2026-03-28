@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -118,6 +119,7 @@ export default function BnplPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<BnplPlan | null>(null);
   const [providerFilter, setProviderFilter] = useState<string>("all");
+  const [selectedPlan, setSelectedPlan] = useState<BnplPlan | null>(null);
 
   // Form state
   const [formAccountId, setFormAccountId] = useState("");
@@ -896,7 +898,7 @@ export default function BnplPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
           {filteredPlans.map((plan) => {
             const paid = plan.instalmentsTotal - plan.instalmentsRemaining;
             const progress = paid / plan.instalmentsTotal;
@@ -907,169 +909,215 @@ export default function BnplPage() {
             const isOverdue = nextDate < now;
 
             return (
-              <Card
+              <button
                 key={plan.id}
-                className={`group relative overflow-hidden border-white/[0.06] bg-zinc-900/60 backdrop-blur-sm transition-all hover:shadow-lg ${
-                  isAlmostDone
-                    ? "border-emerald-500/20"
-                    : isOverdue
-                      ? "border-red-500/20"
-                      : ""
-                }`}
+                onClick={() => setSelectedPlan(plan)}
+                className="flex w-full items-center justify-between rounded-xl border border-white/[0.06] bg-zinc-900/60 px-4 py-3.5 text-left backdrop-blur-sm transition-colors hover:bg-white/[0.02] active:bg-white/[0.04]"
               >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <span className="text-zinc-100">{plan.itemName}</span>
-                        {isAlmostDone && (
-                          <Badge
-                            variant="secondary"
-                            className="border-0 bg-emerald-500/15 text-xs font-semibold text-emerald-400"
-                          >
-                            Almost done!
-                          </Badge>
-                        )}
-                        {isOverdue && (
-                          <Badge
-                            variant="secondary"
-                            className="border-0 bg-red-500/15 text-xs font-semibold text-red-400"
-                          >
-                            Overdue
-                          </Badge>
-                        )}
-                      </CardTitle>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <Badge
-                          variant="secondary"
-                          className={`text-xs font-semibold ${PROVIDER_BADGE_STYLES[plan.provider] || "bg-zinc-500/15 text-zinc-500 border-0"}`}
-                        >
-                          {PROVIDER_LABELS[plan.provider] || plan.provider}
-                        </Badge>
-                        <Badge
-                          variant="secondary"
-                          className={`text-xs font-semibold ${FREQ_BADGE_STYLES[plan.instalmentFrequency] || "bg-zinc-500/15 text-zinc-500 border-0"}`}
-                        >
-                          {FREQ_LABELS[plan.instalmentFrequency]}
-                        </Badge>
-                      </div>
-                    </div>
-                    <p className="text-lg font-bold tabular-nums tracking-tight text-zinc-100">
-                      {formatMoney(plan.totalAmount)}
-                    </p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-medium text-zinc-200">{plan.itemName}</p>
+                    {isOverdue && <span className="h-2 w-2 shrink-0 rounded-full bg-red-400" />}
+                    {isAlmostDone && <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />}
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {/* Progress */}
-                  <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
-                    <div className="mb-1.5 flex items-center justify-between text-sm">
-                      <span className="font-medium text-zinc-300">
-                        Payment Progress
-                      </span>
-                      <span className="text-xs tabular-nums text-zinc-500">
-                        {paid} / {plan.instalmentsTotal} paid
-                      </span>
-                    </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          progress >= 1
-                            ? "bg-emerald-500"
-                            : progress >= 0.75
-                              ? "bg-emerald-500"
-                              : progress >= 0.5
-                                ? "bg-amber-500"
-                                : "bg-sky-500"
-                        }`}
-                        style={{
-                          width: `${Math.min(progress * 100, 100)}%`,
-                        }}
-                      />
-                    </div>
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <Badge variant="secondary" className={`text-[10px] ${PROVIDER_BADGE_STYLES[plan.provider] || "bg-zinc-500/15 text-zinc-500 border-0"}`}>
+                      {PROVIDER_LABELS[plan.provider] || plan.provider}
+                    </Badge>
+                    <span className="text-xs text-zinc-600">{paid}/{plan.instalmentsTotal} paid</span>
                   </div>
-
-                  {/* Payment Details */}
-                  <div className="flex gap-3">
-                    <div className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
-                      <p className="text-xs font-medium uppercase tracking-wider text-zinc-600">
-                        Per Instalment
-                      </p>
-                      <p className="mt-0.5 text-xs font-semibold tabular-nums text-zinc-400">
-                        {formatMoney(plan.instalmentAmount)}
-                      </p>
-                    </div>
-                    <div className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
-                      <p className="text-xs font-medium uppercase tracking-wider text-zinc-600">
-                        Remaining
-                      </p>
-                      <p className="mt-0.5 text-xs font-semibold tabular-nums text-amber-400">
-                        {formatMoney(remainingAmount)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Next Payment */}
-                  <div className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
-                    <Clock
-                      className={`h-3.5 w-3.5 ${isOverdue ? "text-red-400" : "text-zinc-600"}`}
-                    />
-                    <span className="text-xs text-zinc-500">
-                      Next payment:
-                    </span>
-                    <span
-                      className={`text-xs font-semibold ${isOverdue ? "text-red-400" : "text-zinc-300"}`}
-                    >
-                      {formatDate(plan.nextPaymentDate)}
-                    </span>
-                    {isOverdue && (
-                      <AlertTriangle className="ml-auto h-3.5 w-3.5 text-red-400" />
-                    )}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 border-[#c4f441]/20 bg-[#c4f441]/[0.06] text-xs text-[#c4f441] hover:bg-[#c4f441]/10"
-                      onClick={() => handleRecordPayment(plan.id)}
-                    >
-                      <Banknote className="mr-1 h-3 w-3" />
-                      Record Payment
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 border-emerald-500/20 bg-emerald-500/[0.06] text-xs text-emerald-400 hover:bg-emerald-500/10"
-                      onClick={() => handlePaidOff(plan.id)}
-                    >
-                      <CheckCircle2 className="mr-1 h-3 w-3" />
-                      Paid Off
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-zinc-600 hover:text-zinc-300"
-                      onClick={() => openEdit(plan)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-zinc-600 hover:text-red-400"
-                      onClick={() => handleDelete(plan.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </CardContent>
-                <div className="absolute -bottom-4 -right-4 h-24 w-24 rounded-full bg-white/[0.01] blur-2xl transition-all group-hover:bg-white/[0.03]" />
-              </Card>
+                </div>
+                <p className="ml-3 shrink-0 text-sm font-bold tabular-nums text-amber-400">
+                  {formatMoney(remainingAmount)}
+                </p>
+              </button>
             );
           })}
         </div>
       )}
+
+      {/* Plan Detail Dialog */}
+      <Dialog
+        open={selectedPlan !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedPlan(null);
+        }}
+      >
+        <DialogContent className="border-white/[0.08] bg-zinc-900">
+          {selectedPlan && (() => {
+            const plan = selectedPlan;
+            const paid = plan.instalmentsTotal - plan.instalmentsRemaining;
+            const progress = paid / plan.instalmentsTotal;
+            const remainingAmount =
+              plan.instalmentAmount * plan.instalmentsRemaining;
+            const isAlmostDone = progress >= 0.75;
+            const nextDate = new Date(plan.nextPaymentDate);
+            const isOverdue = nextDate < now;
+
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-zinc-100">{plan.itemName}</DialogTitle>
+                  <DialogDescription className="sr-only">
+                    Details for {plan.itemName} BNPL plan
+                  </DialogDescription>
+                </DialogHeader>
+
+                {/* Status Badges */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant="secondary"
+                    className={`text-xs font-semibold ${PROVIDER_BADGE_STYLES[plan.provider] || "bg-zinc-500/15 text-zinc-500 border-0"}`}
+                  >
+                    {PROVIDER_LABELS[plan.provider] || plan.provider}
+                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    className={`text-xs font-semibold ${FREQ_BADGE_STYLES[plan.instalmentFrequency] || "bg-zinc-500/15 text-zinc-500 border-0"}`}
+                  >
+                    {FREQ_LABELS[plan.instalmentFrequency]}
+                  </Badge>
+                  {isAlmostDone && (
+                    <Badge
+                      variant="secondary"
+                      className="border-0 bg-emerald-500/15 text-xs font-semibold text-emerald-400"
+                    >
+                      Almost done!
+                    </Badge>
+                  )}
+                  {isOverdue && (
+                    <Badge
+                      variant="secondary"
+                      className="border-0 bg-red-500/15 text-xs font-semibold text-red-400"
+                    >
+                      Overdue
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Total Amount */}
+                <p className="text-3xl font-bold tabular-nums tracking-tight text-zinc-100">
+                  {formatMoney(plan.totalAmount)}
+                </p>
+
+                {/* Progress Bar */}
+                <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+                  <div className="mb-1.5 flex items-center justify-between text-sm">
+                    <span className="font-medium text-zinc-300">
+                      Payment Progress
+                    </span>
+                    <span className="text-xs tabular-nums text-zinc-500">
+                      {paid} / {plan.instalmentsTotal} paid
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        progress >= 0.75
+                          ? "bg-emerald-500"
+                          : progress >= 0.5
+                            ? "bg-amber-500"
+                            : "bg-sky-500"
+                      }`}
+                      style={{
+                        width: `${Math.min(progress * 100, 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Payment Details */}
+                <div className="flex gap-3">
+                  <div className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+                    <p className="text-xs font-medium uppercase tracking-wider text-zinc-600">
+                      Per Instalment
+                    </p>
+                    <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-400">
+                      {formatMoney(plan.instalmentAmount)}
+                    </p>
+                  </div>
+                  <div className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+                    <p className="text-xs font-medium uppercase tracking-wider text-zinc-600">
+                      Remaining
+                    </p>
+                    <p className="mt-0.5 text-sm font-semibold tabular-nums text-amber-400">
+                      {formatMoney(remainingAmount)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Next Payment */}
+                <div className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+                  <Clock
+                    className={`h-3.5 w-3.5 ${isOverdue ? "text-red-400" : "text-zinc-600"}`}
+                  />
+                  <span className="text-xs text-zinc-500">
+                    Next payment:
+                  </span>
+                  <span
+                    className={`text-xs font-semibold ${isOverdue ? "text-red-400" : "text-zinc-300"}`}
+                  >
+                    {formatDate(plan.nextPaymentDate)}
+                  </span>
+                  {isOverdue && (
+                    <AlertTriangle className="ml-auto h-3.5 w-3.5 text-red-400" />
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 border-[#c4f441]/20 bg-[#c4f441]/[0.06] text-xs text-[#c4f441] hover:bg-[#c4f441]/10"
+                    onClick={() => {
+                      setSelectedPlan(null);
+                      handleRecordPayment(plan.id);
+                    }}
+                  >
+                    <Banknote className="mr-1 h-3 w-3" />
+                    Record Payment
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 border-emerald-500/20 bg-emerald-500/[0.06] text-xs text-emerald-400 hover:bg-emerald-500/10"
+                    onClick={() => {
+                      setSelectedPlan(null);
+                      handlePaidOff(plan.id);
+                    }}
+                  >
+                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                    Paid Off
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-zinc-600 hover:text-zinc-300"
+                    onClick={() => {
+                      setSelectedPlan(null);
+                      openEdit(plan);
+                    }}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-zinc-600 hover:text-red-400"
+                    onClick={() => {
+                      setSelectedPlan(null);
+                      handleDelete(plan.id);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

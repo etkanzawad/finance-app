@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -46,6 +46,7 @@ export default function GoalsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<SavingsGoal | null>(null);
   const [bnplExposure, setBnplExposure] = useState(0);
+  const [selectedGoal, setSelectedGoal] = useState<SavingsGoal | null>(null);
 
   // Form state
   const [formName, setFormName] = useState("");
@@ -387,46 +388,68 @@ export default function GoalsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+        <div className="flex flex-col gap-2">
           {goals.map((goal) => {
             const progress = (goal.currentAmount / goal.targetAmount) * 100;
-            const remaining = goal.targetAmount - goal.currentAmount;
             const isComplete = goal.currentAmount >= goal.targetAmount;
-            const timeline = getTimelineInfo(goal);
 
             return (
-              <Card key={goal.id} className={isComplete ? "border-green-500/50 bg-green-500/5" : ""}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        {goal.name}
-                        {isComplete && <Badge className="bg-green-500">Complete</Badge>}
-                      </CardTitle>
-                      <CardDescription className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className={PRIORITY_COLORS[goal.priority]}>
-                          {PRIORITY_LABELS[goal.priority]}
-                        </Badge>
-                        {goal.deadline && (
-                          <span>Due {formatDate(goal.deadline)}</span>
-                        )}
-                      </CardDescription>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(goal)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(goal.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
+              <button
+                key={goal.id}
+                onClick={() => setSelectedGoal(goal)}
+                className="flex w-full items-center justify-between rounded-xl border border-white/[0.06] bg-zinc-900/60 px-4 py-3.5 text-left backdrop-blur-sm transition-colors hover:bg-white/[0.02] active:bg-white/[0.04]"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-medium text-zinc-200">{goal.name}</p>
+                    {isComplete && <Badge className="bg-green-500 text-xs">Done</Badge>}
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                  <div className="mt-1 h-1.5 w-full max-w-[120px] overflow-hidden rounded-full bg-white/[0.06]">
+                    <div className={`h-full rounded-full ${isComplete ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${Math.min(progress, 100)}%` }} />
+                  </div>
+                </div>
+                <div className="ml-3 shrink-0 text-right">
+                  <p className="text-sm font-bold tabular-nums text-zinc-100">{formatMoney(goal.currentAmount)}</p>
+                  <p className="text-xs tabular-nums text-zinc-600">of {formatMoney(goal.targetAmount)}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Goal Detail Dialog */}
+      <Dialog open={!!selectedGoal} onOpenChange={(open) => { if (!open) setSelectedGoal(null); }}>
+        <DialogContent>
+          {selectedGoal && (() => {
+            const progress = (selectedGoal.currentAmount / selectedGoal.targetAmount) * 100;
+            const remaining = selectedGoal.targetAmount - selectedGoal.currentAmount;
+            const isComplete = selectedGoal.currentAmount >= selectedGoal.targetAmount;
+            const timeline = getTimelineInfo(selectedGoal);
+
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle>{selectedGoal.name}</DialogTitle>
+                  <DialogDescription asChild>
+                    <div className="flex items-center gap-2 pt-1">
+                      <Badge variant="outline" className={PRIORITY_COLORS[selectedGoal.priority]}>
+                        {PRIORITY_LABELS[selectedGoal.priority]}
+                      </Badge>
+                      {selectedGoal.deadline && (
+                        <span className="text-sm text-muted-foreground">Due {formatDate(selectedGoal.deadline)}</span>
+                      )}
+                      {isComplete && <Badge className="bg-green-500">Complete</Badge>}
+                    </div>
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  {/* Progress */}
                   <div>
                     <div className="flex justify-between text-sm mb-1">
-                      <span>{formatMoney(goal.currentAmount)}</span>
-                      <span className="text-muted-foreground">{formatMoney(goal.targetAmount)}</span>
+                      <span>{formatMoney(selectedGoal.currentAmount)}</span>
+                      <span className="text-muted-foreground">{formatMoney(selectedGoal.targetAmount)}</span>
                     </div>
                     <Progress value={Math.min(progress, 100)} className="h-3" />
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -434,6 +457,7 @@ export default function GoalsPage() {
                     </p>
                   </div>
 
+                  {/* Timeline */}
                   {timeline && !isComplete && (
                     <>
                       <Separator />
@@ -447,6 +471,7 @@ export default function GoalsPage() {
                     </>
                   )}
 
+                  {/* BNPL Warning */}
                   {bnplExposure > 0 && !isComplete && (
                     <div className="flex items-center gap-2 rounded-md bg-amber-500/10 p-2 text-xs text-amber-500">
                       <AlertTriangle className="h-3 w-3 shrink-0" />
@@ -458,12 +483,40 @@ export default function GoalsPage() {
                       </span>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+
+                  {/* Actions */}
+                  <Separator />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setSelectedGoal(null);
+                        openEdit(selectedGoal);
+                      }}
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 text-destructive hover:text-destructive"
+                      onClick={() => {
+                        const goalId = selectedGoal.id;
+                        setSelectedGoal(null);
+                        handleDelete(goalId);
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </>
             );
-          })}
-        </div>
-      )}
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

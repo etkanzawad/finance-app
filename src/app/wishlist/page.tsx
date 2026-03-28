@@ -19,13 +19,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -52,7 +45,6 @@ import {
   Loader2,
   Archive,
   CheckCircle2,
-  MoreHorizontal,
   Bot,
   ShieldCheck,
   AlertTriangle,
@@ -254,6 +246,7 @@ function WishlistContent() {
   const [bnplAdvisorLoading, setBnplAdvisorLoading] = useState(false);
   const [priceCheck, setPriceCheck] = useState<PriceCheckResponse | null>(null);
   const [priceCheckLoading, setPriceCheckLoading] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<WishlistItem | null>(null);
 
 
   // Form state
@@ -954,7 +947,7 @@ function WishlistContent() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+        <div className="space-y-2">
           {filteredItems.map((item) => {
             const goalProgress =
               item.linkedGoalId && item.goalTargetAmount
@@ -964,191 +957,242 @@ function WishlistContent() {
               goalProgress !== null && goalProgress >= 1;
 
             return (
-              <Card
+              <button
                 key={item.id}
-                className={`group relative overflow-hidden border-white/[0.06] bg-zinc-900/60 backdrop-blur-sm transition-all hover:shadow-lg ${
-                  item.status === "purchased"
-                    ? "border-emerald-500/20"
-                    : isReadyToBuy
-                      ? "border-emerald-500/20"
-                      : ""
-                }`}
+                onClick={() => setSelectedItem(item)}
+                className="flex w-full items-center justify-between rounded-xl border border-white/[0.06] bg-zinc-900/60 px-4 py-3.5 text-left backdrop-blur-sm transition-colors hover:bg-white/[0.02] active:bg-white/[0.04]"
               >
-                <CardHeader className="pb-2">
-                  {/* Top row: name + dot-menu */}
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-base">
-                      <span className="text-zinc-100 leading-snug">{item.name}</span>
-                    </CardTitle>
-                    {/* ⋯ Dot-menu — top right of card */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="-mr-2 -mt-1 h-8 w-8 shrink-0 text-zinc-500 hover:text-zinc-200"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        className="w-44 border-white/[0.08] bg-zinc-900"
-                      >
-                        {item.url && (
-                          <DropdownMenuItem asChild>
-                            <a
-                              href={item.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex cursor-pointer items-center gap-2 text-zinc-300"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                              View listing
-                            </a>
-                          </DropdownMenuItem>
-                        )}
-                        {(item.status === "wanted" || item.status === "saving") && (
-                          <>
-                            {item.url && <DropdownMenuSeparator className="bg-white/[0.06]" />}
-                            <DropdownMenuItem
-                              className="flex cursor-pointer items-center gap-2 text-emerald-400 focus:text-emerald-300"
-                              onClick={() => handleStatusChange(item.id, "purchased")}
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Mark as bought
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="flex cursor-pointer items-center gap-2 text-zinc-400 focus:text-zinc-200"
-                              onClick={() => handleStatusChange(item.id, "archived")}
-                            >
-                              <Archive className="h-3.5 w-3.5" />
-                              Archive
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        {item.status === "archived" && (
-                          <DropdownMenuItem
-                            className="flex cursor-pointer items-center gap-2 text-zinc-400 focus:text-zinc-200"
-                            onClick={() => handleStatusChange(item.id, "wanted")}
-                          >
-                            <RefreshCw className="h-3.5 w-3.5" />
-                            Unarchive
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuSeparator className="bg-white/[0.06]" />
-                        <DropdownMenuItem
-                          className="flex cursor-pointer items-center gap-2 text-zinc-400 focus:text-zinc-200"
-                          onClick={() => openEdit(item)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="flex cursor-pointer items-center gap-2 text-red-400 focus:text-red-300"
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-
-                  {/* Badges row */}
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    {isReadyToBuy && (
-                      <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400 border-0 text-xs font-semibold">
-                        Ready to buy!
-                      </Badge>
-                    )}
-                    {item.status === "purchased" && (
-                      <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400 border-0 text-xs font-semibold">
-                        Purchased
-                      </Badge>
-                    )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-zinc-200">{item.name}</p>
+                  <div className="mt-0.5 flex items-center gap-1.5">
                     <Badge
                       variant="secondary"
-                      className={`text-xs font-semibold ${PRIORITY_BADGE_STYLES[item.priority]}`}
-                    >
-                      {PRIORITY_LABELS[item.priority]}
-                    </Badge>
-                    <Badge
-                      variant="secondary"
-                      className={`text-xs font-semibold ${STATUS_BADGE_STYLES[item.status]}`}
+                      className={`text-[10px] font-semibold px-1.5 py-0 ${STATUS_BADGE_STYLES[item.status]}`}
                     >
                       {STATUS_LABELS[item.status]}
                     </Badge>
+                    <Badge
+                      variant="secondary"
+                      className={`text-[10px] font-semibold px-1.5 py-0 ${PRIORITY_BADGE_STYLES[item.priority]}`}
+                    >
+                      {PRIORITY_LABELS[item.priority]}
+                    </Badge>
                     {item.category && (
-                      <Badge variant="secondary" className="text-xs border-0 bg-zinc-800 text-zinc-500">
-                        {item.category}
+                      <span className="text-[10px] text-zinc-600">{item.category}</span>
+                    )}
+                    {isReadyToBuy && (
+                      <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400 border-0 text-[10px] font-semibold px-1.5 py-0">
+                        Ready!
                       </Badge>
                     )}
-                    {item.store && (
-                      <span className="text-xs text-zinc-600">{item.store}</span>
-                    )}
                   </div>
-
-                  {/* Price — below tags */}
-                  <p className="mt-2 text-lg font-bold tabular-nums tracking-tight text-zinc-100">
-                    {formatMoney(item.price)}
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {item.notes && (
-                    <p className="text-sm text-zinc-500">{item.notes}</p>
-                  )}
-
-                  {/* Linked Goal Progress */}
-                  {item.linkedGoalId && item.goalName && (
-                    <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
-                      <div className="flex items-center gap-2 text-sm mb-1.5">
-                        <Target className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                        <span className="font-medium text-zinc-300 truncate">{item.goalName}</span>
-                      </div>
-                      <div className="flex justify-between text-xs mb-1.5">
-                        <span className="text-zinc-400">{formatMoney(item.goalCurrentAmount || 0)}</span>
-                        <span className="text-zinc-600">
-                          {formatMoney(item.goalTargetAmount || item.price)}
-                        </span>
-                      </div>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            (goalProgress || 0) >= 1 ? "bg-emerald-500" : "bg-amber-500"
-                          }`}
-                          style={{ width: `${Math.min((goalProgress || 0) * 100, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* BNPL Estimates */}
-                  {(item.status === "wanted" || item.status === "saving") && (
-                    <div className="flex gap-2">
-                      <div className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
-                        <p className="text-xs font-medium uppercase tracking-wider text-zinc-600">Afterpay</p>
-                        <p className="mt-0.5 text-xs font-semibold tabular-nums text-zinc-400">
-                          4 × {formatMoney(Math.ceil(item.price / 4))}
-                        </p>
-                      </div>
-                      <div className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
-                        <p className="text-xs font-medium uppercase tracking-wider text-zinc-600">Zip Pay</p>
-                        <p className="mt-0.5 text-xs font-semibold tabular-nums text-zinc-400">
-                          ~{formatMoney(Math.max(4000, Math.ceil(item.price * 0.03)))}/mo
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-
-                </CardContent>
-                <div className="absolute -bottom-4 -right-4 h-24 w-24 rounded-full bg-white/[0.01] blur-2xl transition-all group-hover:bg-white/[0.03]" />
-              </Card>
+                </div>
+                <p className="ml-3 shrink-0 text-sm font-bold tabular-nums text-zinc-100">
+                  {formatMoney(item.price)}
+                </p>
+              </button>
             );
           })}
         </div>
       )}
+
+      {/* Detail Dialog */}
+      <Dialog
+        open={selectedItem !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedItem(null);
+        }}
+      >
+        {selectedItem && (() => {
+          const goalProgress =
+            selectedItem.linkedGoalId && selectedItem.goalTargetAmount
+              ? (selectedItem.goalCurrentAmount || 0) / selectedItem.goalTargetAmount
+              : null;
+          const isReadyToBuy =
+            goalProgress !== null && goalProgress >= 1;
+
+          return (
+            <DialogContent className="border-white/[0.08] bg-zinc-900 max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-lg text-zinc-100">{selectedItem.name}</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                {/* Badges */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Badge
+                    variant="secondary"
+                    className={`text-xs font-semibold ${STATUS_BADGE_STYLES[selectedItem.status]}`}
+                  >
+                    {STATUS_LABELS[selectedItem.status]}
+                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    className={`text-xs font-semibold ${PRIORITY_BADGE_STYLES[selectedItem.priority]}`}
+                  >
+                    {PRIORITY_LABELS[selectedItem.priority]}
+                  </Badge>
+                  {selectedItem.category && (
+                    <Badge variant="secondary" className="text-xs border-0 bg-zinc-800 text-zinc-500">
+                      {selectedItem.category}
+                    </Badge>
+                  )}
+                  {selectedItem.store && (
+                    <Badge variant="secondary" className="text-xs border-0 bg-zinc-800 text-zinc-500">
+                      {selectedItem.store}
+                    </Badge>
+                  )}
+                  {isReadyToBuy && (
+                    <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400 border-0 text-xs font-semibold">
+                      Ready to buy!
+                    </Badge>
+                  )}
+                  {selectedItem.status === "purchased" && (
+                    <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400 border-0 text-xs font-semibold">
+                      Purchased
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Price */}
+                <p className="text-2xl font-bold tabular-nums tracking-tight text-zinc-100">
+                  {formatMoney(selectedItem.price)}
+                </p>
+
+                {/* Notes */}
+                {selectedItem.notes && (
+                  <p className="text-sm text-zinc-500">{selectedItem.notes}</p>
+                )}
+
+                {/* Linked Goal Progress */}
+                {selectedItem.linkedGoalId && selectedItem.goalName && (
+                  <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+                    <div className="flex items-center gap-2 text-sm mb-1.5">
+                      <Target className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                      <span className="font-medium text-zinc-300 truncate">{selectedItem.goalName}</span>
+                    </div>
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="text-zinc-400">{formatMoney(selectedItem.goalCurrentAmount || 0)}</span>
+                      <span className="text-zinc-600">
+                        {formatMoney(selectedItem.goalTargetAmount || selectedItem.price)}
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          (goalProgress || 0) >= 1 ? "bg-emerald-500" : "bg-amber-500"
+                        }`}
+                        style={{ width: `${Math.min((goalProgress || 0) * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* BNPL Estimates */}
+                {(selectedItem.status === "wanted" || selectedItem.status === "saving") && (
+                  <div className="flex gap-2">
+                    <div className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+                      <p className="text-xs font-medium uppercase tracking-wider text-zinc-600">Afterpay</p>
+                      <p className="mt-0.5 text-xs font-semibold tabular-nums text-zinc-400">
+                        4 × {formatMoney(Math.ceil(selectedItem.price / 4))}
+                      </p>
+                    </div>
+                    <div className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+                      <p className="text-xs font-medium uppercase tracking-wider text-zinc-600">Zip Pay</p>
+                      <p className="mt-0.5 text-xs font-semibold tabular-nums text-zinc-400">
+                        ~{formatMoney(Math.max(4000, Math.ceil(selectedItem.price * 0.03)))}/mo
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="space-y-2 pt-2">
+                  {selectedItem.url && (
+                    <a
+                      href={selectedItem.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                    >
+                      <Button
+                        variant="outline"
+                        className="w-full border-white/[0.08] bg-white/[0.03] text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100"
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        View Listing
+                      </Button>
+                    </a>
+                  )}
+                  {(selectedItem.status === "wanted" || selectedItem.status === "saving") && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1 border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-400 hover:bg-emerald-500/[0.12] hover:text-emerald-300"
+                        onClick={() => {
+                          handleStatusChange(selectedItem.id, "purchased");
+                          setSelectedItem(null);
+                        }}
+                      >
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Mark as Bought
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1 border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
+                        onClick={() => {
+                          handleStatusChange(selectedItem.id, "archived");
+                          setSelectedItem(null);
+                        }}
+                      >
+                        <Archive className="mr-2 h-4 w-4" />
+                        Archive
+                      </Button>
+                    </div>
+                  )}
+                  {selectedItem.status === "archived" && (
+                    <Button
+                      variant="outline"
+                      className="w-full border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
+                      onClick={() => {
+                        handleStatusChange(selectedItem.id, "wanted");
+                        setSelectedItem(null);
+                      }}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Unarchive
+                    </Button>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
+                      onClick={() => {
+                        openEdit(selectedItem);
+                        setSelectedItem(null);
+                      }}
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 border-red-500/20 bg-red-500/[0.06] text-red-400 hover:bg-red-500/[0.12] hover:text-red-300"
+                      onClick={() => {
+                        handleDelete(selectedItem.id);
+                        setSelectedItem(null);
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          );
+        })()}
+      </Dialog>
 
 
     </div>
