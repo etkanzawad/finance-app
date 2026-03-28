@@ -13,12 +13,14 @@ import {
   User,
   LogOut,
   MessageSquare,
+  Receipt,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export const mainNavItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/wishlist", label: "Wishlist", icon: Heart },
   { href: "/bnpl", label: "BNPL Tracker", icon: CreditCard },
   { href: "/history", label: "Chat History", icon: MessageSquare },
