@@ -12,5 +12,5 @@ export function getAI(): OpenAI {
   return _ai;
 }
 
-export const MODEL = "qwen3.5:32b-cloud";
-export const MODEL_FAST = "qwen3.5:14b-cloud";
+export const MODEL = "kimi-k2.5:cloud";
+export const MODEL_FAST = "kimi-k2.5:cloud";
