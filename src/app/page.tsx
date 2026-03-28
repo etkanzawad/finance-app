@@ -464,7 +464,8 @@ function DashboardInner() {
 
   return (
     <div
-      className={`flex flex-col -m-4 lg:-m-8 h-[100dvh] lg:h-screen ${isDragging ? "ring-2 ring-[#c4f441]/30 ring-inset" : ""}`}
+      style={{ height: "calc(100dvh - env(safe-area-inset-top, 0px) - 4.5rem)" }}
+      className={`flex flex-col -mx-4 -mb-4 lg:-m-8 lg:!h-screen ${isDragging ? "ring-2 ring-[#c4f441]/30 ring-inset" : ""}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
