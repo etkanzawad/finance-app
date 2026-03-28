@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAI, MODEL } from "@/lib/chat-helpers";
+import { getAI, MODEL_FAST } from "@/lib/chat-helpers";
 
 export async function POST(req: NextRequest) {
   const { messages } = await req.json();
@@ -15,21 +15,17 @@ export async function POST(req: NextRequest) {
       .map((m: { role: string; content: string }) => `${m.role}: ${m.content.slice(0, 200)}`)
       .join("\n");
 
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: [
+    const response = await ai.chat.completions.create({
+      model: MODEL_FAST,
+      messages: [
         {
           role: "user",
-          parts: [
-            {
-              text: `Given this conversation, generate a short title (3-5 words, no quotes). Just respond with the title, nothing else.\n\n${preview}`,
-            },
-          ],
+          content: `Given this conversation, generate a short title (3-5 words, no quotes). Just respond with the title, nothing else.\n\n${preview}`,
         },
       ],
     });
 
-    const title = response.text?.trim() || "New Chat";
+    const title = response.choices[0]?.message?.content?.trim() || "New Chat";
 
     return NextResponse.json({ title });
   } catch {

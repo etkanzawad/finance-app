@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { eq, and, like, desc } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
+import { toCamel } from "@/lib/db/camel";
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -10,45 +10,44 @@ export async function GET(request: NextRequest) {
   const search = params.get("search");
   const reviewed = params.get("reviewed");
 
-  const conditions = [];
+  const supabase = await createClient();
+
+  let query = supabase
+    .from('transactions')
+    .select('*')
+    .order('date', { ascending: false });
 
   if (month) {
-    conditions.push(eq(schema.transactions.statementMonth, month));
+    query = query.eq('statement_month', month);
   }
   if (category) {
-    conditions.push(eq(schema.transactions.category, category));
+    query = query.eq('category', category);
   }
   if (accountId) {
-    conditions.push(eq(schema.transactions.accountId, Number(accountId)));
+    query = query.eq('account_id', Number(accountId));
   }
   if (search) {
-    conditions.push(like(schema.transactions.cleanDescription, `%${search}%`));
+    query = query.ilike('clean_description', `%${search}%`);
   }
   if (reviewed === "true") {
-    conditions.push(eq(schema.transactions.isReviewed, true));
+    query = query.eq('is_reviewed', true);
   } else if (reviewed === "false") {
-    conditions.push(eq(schema.transactions.isReviewed, false));
+    query = query.eq('is_reviewed', false);
   }
 
-  const rows =
-    conditions.length > 0
-      ? await db
-          .select()
-          .from(schema.transactions)
-          .where(and(...conditions))
-          .orderBy(desc(schema.transactions.date))
-      : await db
-          .select()
-          .from(schema.transactions)
-          .orderBy(desc(schema.transactions.date));
+  const { data, error } = await query;
 
-  return NextResponse.json(rows);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(toCamel(data));
 }
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const { transactions: txns } = body as {
-    transactions: (typeof schema.transactions.$inferInsert)[];
+    transactions: Record<string, unknown>[];
   };
 
   if (!txns || !Array.isArray(txns) || txns.length === 0) {
@@ -58,14 +57,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const supabase = await createClient();
+
   const inserted = [];
   for (const tx of txns) {
-    const result = await db
-      .insert(schema.transactions)
-      .values(tx)
-      .returning();
-    inserted.push(result[0]);
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert(tx)
+      .select();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    inserted.push(data![0]);
   }
 
-  return NextResponse.json({ inserted: inserted.length, transactions: inserted });
+  return NextResponse.json({ inserted: inserted.length, transactions: toCamel(inserted) });
 }

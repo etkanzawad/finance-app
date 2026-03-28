@@ -1,8 +1,7 @@
-import { db } from "@/lib/db";
-import { wishlistItems } from "@/lib/db/schema";
+import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import FirecrawlApp from "@mendable/firecrawl-js";
-import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
 
 let _firecrawl: FirecrawlApp | null = null;
 function getFirecrawl(): FirecrawlApp {
@@ -12,10 +11,13 @@ function getFirecrawl(): FirecrawlApp {
   return _firecrawl;
 }
 
-let _ai: GoogleGenAI | null = null;
-function getAI(): GoogleGenAI {
+let _ai: OpenAI | null = null;
+function getAI(): OpenAI {
   if (!_ai) {
-    _ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+    _ai = new OpenAI({
+      baseURL: "https://ollama.com/v1/",
+      apiKey: process.env.OLLAMA_API_KEY || "",
+    });
   }
   return _ai;
 }
@@ -38,14 +40,18 @@ interface PriceCheckResult {
 
 export async function POST() {
   try {
+    const supabase = await createClient();
+
     // Fetch all active wishlist items that have URLs
-    const items = await db
-      .select()
-      .from(wishlistItems)
-      .orderBy(wishlistItems.priority);
+    const { data, error } = await supabase
+      .from("wishlist_items")
+      .select("*")
+      .order("priority");
+
+    const items = data || [];
 
     const itemsWithUrls = items.filter(
-      (item) =>
+      (item: any) =>
         item.url &&
         (item.status === "wanted" || item.status === "saving")
     );
@@ -68,7 +74,7 @@ export async function POST() {
 
     for (const chunk of chunks) {
       const chunkResults = await Promise.allSettled(
-        chunk.map(async (item) => {
+        chunk.map(async (item: any) => {
           try {
             // Scrape the product page with Firecrawl
             const scrapeResult = await getFirecrawl().scrape(item.url!, {
@@ -94,7 +100,7 @@ export async function POST() {
               } as PriceCheckResult;
             }
 
-            // Use Gemini to extract price information from the scraped content
+            // Use AI to extract price information from the scraped content
             const priceData = await extractPriceWithAI(
               scrapeResult.markdown,
               item.name,
@@ -266,12 +272,13 @@ CRITICAL: Do NOT assume prices are in AUD. Detect the actual currency from the p
 
 Return ONLY valid JSON, no markdown formatting.`;
 
-  const response = await getAI().models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
+  const response = await getAI().chat.completions.create({
+    model: "qwen3.5:32b-cloud",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
   });
 
-  const text = response.text || "";
+  const text = response.choices[0]?.message?.content || "";
   const cleaned = text
     .replace(/```json\n?/g, "")
     .replace(/```\n?/g, "")

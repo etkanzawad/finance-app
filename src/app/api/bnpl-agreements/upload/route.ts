@@ -1,8 +1,6 @@
-import { db } from "@/lib/db";
-import { bnplAgreements } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { toCamel } from "@/lib/db/camel";
 
 // Valid BNPL providers
 const VALID_PROVIDERS = ["afterpay", "zip_pay", "zip_money", "paypal_pay4"] as const;
@@ -14,7 +12,7 @@ function isValidProvider(provider: string): provider is BnplProvider {
 
 // PDF magic bytes: %PDF
 function isPdfByMagicBytes(buffer: Buffer): boolean {
-  return buffer.length >= 4 && 
+  return buffer.length >= 4 &&
     buffer[0] === 0x25 && // %
     buffer[1] === 0x50 && // P
     buffer[2] === 0x44 && // D
@@ -23,7 +21,8 @@ function isPdfByMagicBytes(buffer: Buffer): boolean {
 
 export async function POST(req: NextRequest) {
   let storagePath: string | null = null;
-  
+  let supabase: Awaited<ReturnType<typeof createClient>> | null = null;
+
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -69,7 +68,7 @@ export async function POST(req: NextRequest) {
     const isPdfExt = ext === 'pdf';
     const isMdExt = ext === 'md';
     const isTxtExt = ext === 'txt';
-    
+
     if (!isPdfExt && !isMdExt && !isTxtExt) {
       return NextResponse.json(
         { error: "Only PDF and Markdown (.md, .txt) files are allowed" },
@@ -99,7 +98,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Initialize Supabase client
-    const supabase = await createClient();
+    supabase = await createClient();
 
     // Generate unique filename
     const timestamp = Date.now();
@@ -107,10 +106,10 @@ export async function POST(req: NextRequest) {
     storagePath = `${provider}/${timestamp}-${safeFileName}`;
 
     // Upload file to Supabase Storage
-    const contentType = isPdfExt 
-      ? "application/pdf" 
-      : isMdExt 
-        ? "text/markdown" 
+    const contentType = isPdfExt
+      ? "application/pdf"
+      : isMdExt
+        ? "text/markdown"
         : "text/plain";
     const { data: uploadData, error: uploadError } = await supabase
       .storage
@@ -143,33 +142,39 @@ export async function POST(req: NextRequest) {
     }
 
     // Save metadata to database
-    const result = await db
-      .insert(bnplAgreements)
-      .values({
+    const { data, error } = await supabase
+      .from('bnpl_agreements')
+      .insert({
         provider,
-        fileName: file.name,
-        fileSize: fileBuffer.length,
-        storagePath,
-        publicUrl: storagePath, // Store path only - generate signed URLs on demand
-        extractedText,
+        file_name: file.name,
+        file_size: fileBuffer.length,
+        storage_path: storagePath,
+        public_url: storagePath, // Store path only - generate signed URLs on demand
+        extracted_text: extractedText,
         notes: notes ?? null,
       })
-      .returning();
+      .select();
 
-    return NextResponse.json(result[0], { status: 201 });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(toCamel(data![0]), { status: 201 });
   } catch (error) {
     console.error("Error uploading BNPL agreement:", error);
-    
+
     // Clean up orphaned storage file if DB insert failed
     if (storagePath) {
       try {
-        const supabase = await createClient();
+        if (!supabase) {
+          supabase = await createClient();
+        }
         await supabase.storage.from("bnpl-agreements").remove([storagePath]);
       } catch (cleanupError) {
         console.error("Failed to clean up orphaned storage file:", cleanupError);
       }
     }
-    
+
     return NextResponse.json(
       { error: "Failed to upload agreement" },
       { status: 500 }

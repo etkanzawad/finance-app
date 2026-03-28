@@ -1,26 +1,28 @@
-import { db } from "@/lib/db";
-import { settings, income, accounts, bnplAccounts, bnplPlans, fixedExpenses, transactions, savingsGoals, merchantMappings } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET() {
-  const rows = await db.select().from(settings);
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.from('settings').select('*');
+  if (error) throw error;
+
   const result: Record<string, string> = {};
-  for (const row of rows) {
+  for (const row of data) {
     result[row.key] = row.value;
   }
   return NextResponse.json(result);
 }
 
 export async function PUT(req: NextRequest) {
+  const supabase = await createClient();
   const body = await req.json();
   const { key, value } = body;
 
-  const existing = await db.select().from(settings).where(eq(settings.key, key));
-  if (existing.length > 0) {
-    await db.update(settings).set({ value }).where(eq(settings.key, key));
-  } else {
-    await db.insert(settings).values({ key, value });
-  }
+  const { error } = await supabase
+    .from('settings')
+    .upsert({ key, value }, { onConflict: 'key' });
+  if (error) throw error;
+
   return NextResponse.json({ success: true });
 }

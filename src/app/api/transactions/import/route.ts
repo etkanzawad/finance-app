@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { like } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
 import { categoriseTransactions } from "@/lib/gemini";
+import { toCamel } from "@/lib/db/camel";
 
 interface ParsedTransaction {
   date: string;
@@ -76,8 +76,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const supabase = await createClient();
+
   // Step 1: Clean descriptions and check merchant_mappings
-  const allMappings = await db.select().from(schema.merchantMappings);
+  const { data: allMappings, error: mappingsError } = await supabase
+    .from('merchant_mappings')
+    .select('*');
+
+  if (mappingsError) {
+    return NextResponse.json({ error: mappingsError.message }, { status: 500 });
+  }
 
   const needsCategorisation: { index: number; cleaned: string }[] = [];
   const results: {
@@ -93,15 +101,15 @@ export async function POST(request: NextRequest) {
     const isIncome = detectIncome(tx.rawDescription, tx.amount);
 
     // Check merchant_mappings for a match
-    const mapping = allMappings.find((m) => {
-      const pattern = m.rawPattern.toLowerCase();
+    const mapping = allMappings!.find((m: { raw_pattern: string; clean_name: string; category: string }) => {
+      const pattern = m.raw_pattern.toLowerCase();
       return cleaned.toLowerCase().includes(pattern);
     });
 
     if (mapping) {
       results.push({
         index: i,
-        cleanName: mapping.cleanName,
+        cleanName: mapping.clean_name,
         category: mapping.category,
         isIncome,
       });
@@ -160,37 +168,36 @@ export async function POST(request: NextRequest) {
   const reviewTransactions = parsedTxns.map((tx, i) => {
     const result = results.find((r) => r.index === i);
     return {
-      accountId,
+      account_id: accountId,
       date: tx.date,
-      rawDescription: tx.rawDescription,
-      cleanDescription: result?.cleanName || cleanNabDescription(tx.rawDescription),
+      raw_description: tx.rawDescription,
+      clean_description: result?.cleanName || cleanNabDescription(tx.rawDescription),
       amount: tx.amount,
-      balanceAfter: tx.balanceAfter ?? null,
+      balance_after: tx.balanceAfter ?? null,
       category: result?.category || "Other",
-      isIncome: result?.isIncome || false,
-      isReviewed: false,
-      statementMonth: tx.statementMonth,
+      is_income: result?.isIncome || false,
+      is_reviewed: false,
+      statement_month: tx.statementMonth,
     };
   });
 
   // Check for duplicates
-  const existingTxns = await db
-    .select()
-    .from(schema.transactions)
-    .where(
-      like(
-        schema.transactions.statementMonth,
-        reviewTransactions[0]?.statementMonth || "%"
-      )
-    );
+  const { data: existingTxns, error: existingError } = await supabase
+    .from('transactions')
+    .select('*')
+    .ilike('statement_month', reviewTransactions[0]?.statement_month || "%");
+
+  if (existingError) {
+    return NextResponse.json({ error: existingError.message }, { status: 500 });
+  }
 
   const duplicates: number[] = [];
   for (let i = 0; i < reviewTransactions.length; i++) {
     const tx = reviewTransactions[i];
-    const isDuplicate = existingTxns.some(
-      (existing) =>
+    const isDuplicate = existingTxns!.some(
+      (existing: { date: string; raw_description: string; amount: number }) =>
         existing.date === tx.date &&
-        existing.rawDescription === tx.rawDescription &&
+        existing.raw_description === tx.raw_description &&
         existing.amount === tx.amount
     );
     if (isDuplicate) {
@@ -199,7 +206,7 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({
-    transactions: reviewTransactions,
+    transactions: toCamel(reviewTransactions),
     duplicates,
     total: reviewTransactions.length,
     categorised: results.filter((r) => r.category !== "Other").length,

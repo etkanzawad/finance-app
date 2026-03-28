@@ -1,13 +1,4 @@
-import { db } from "@/lib/db";
-import {
-  accounts,
-  income,
-  fixedExpenses,
-  bnplAccounts,
-  bnplPlans,
-  savingsGoals,
-} from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
 import { projectCashflow, type CashflowEvent } from "@/lib/cashflow";
 import { getPurchaseAdvice } from "@/lib/gemini";
 import { NextRequest, NextResponse } from "next/server";
@@ -265,6 +256,7 @@ function scoreStrategy(
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = await createClient();
     const body = await req.json();
     const { item, price, urgency } = body as {
       item: string;
@@ -281,61 +273,68 @@ export async function POST(req: NextRequest) {
 
     // Fetch all financial data
     const [
-      allAccounts,
-      allIncome,
-      allExpenses,
-      allBnplAccounts,
-      allBnplPlans,
-      allSavingsGoals,
+      accountsResult,
+      incomeResult,
+      expensesResult,
+      bnplAccountsResult,
+      bnplPlansResult,
+      savingsGoalsResult,
     ] = await Promise.all([
-      db.select().from(accounts),
-      db.select().from(income),
-      db.select().from(fixedExpenses).where(eq(fixedExpenses.isActive, true)),
-      db.select().from(bnplAccounts).where(eq(bnplAccounts.isActive, true)),
-      db.select().from(bnplPlans),
-      db.select().from(savingsGoals),
+      supabase.from("accounts").select("*"),
+      supabase.from("income").select("*"),
+      supabase.from("fixed_expenses").select("*").eq("is_active", true),
+      supabase.from("bnpl_accounts").select("*").eq("is_active", true),
+      supabase.from("bnpl_plans").select("*"),
+      supabase.from("savings_goals").select("*"),
     ]);
 
+    const allAccounts = accountsResult.data || [];
+    const allIncome = incomeResult.data || [];
+    const allExpenses = expensesResult.data || [];
+    const allBnplAccounts = bnplAccountsResult.data || [];
+    const allBnplPlans = bnplPlansResult.data || [];
+    const allSavingsGoals = savingsGoalsResult.data || [];
+
     // Calculate starting balance from bank accounts
-    const bankAccounts = allAccounts.filter((a) => a.type === "bank");
-    const startingBalance = bankAccounts.reduce((sum, a) => sum + a.balance, 0);
+    const bankAccounts = allAccounts.filter((a: any) => a.type === "bank");
+    const startingBalance = bankAccounts.reduce((sum: number, a: any) => sum + a.balance, 0);
 
     // Build cashflow inputs
-    const incomeInputs = allIncome.map((i) => ({
+    const incomeInputs = allIncome.map((i: any) => ({
       name: i.name,
       amount: i.amount,
       frequency: i.frequency,
-      nextPayDate: i.nextPayDate,
+      nextPayDate: i.next_pay_date,
     }));
 
-    const expenseInputs = allExpenses.map((e) => ({
+    const expenseInputs = allExpenses.map((e: any) => ({
       name: e.name,
       amount: e.amount,
       frequency: e.frequency,
-      nextDueDate: e.nextDueDate,
+      nextDueDate: e.next_due_date,
     }));
 
     const bnplPaymentInputs = allBnplPlans
-      .filter((p) => p.instalmentsRemaining > 0)
-      .map((p) => {
-        const account = allBnplAccounts.find((a) => a.id === p.bnplAccountId);
+      .filter((p: any) => p.instalments_remaining > 0)
+      .map((p: any) => {
+        const account = allBnplAccounts.find((a: any) => a.id === p.bnpl_account_id);
         return {
-          itemName: p.itemName,
+          itemName: p.item_name,
           provider: account?.provider || "unknown",
-          instalmentAmount: p.instalmentAmount,
-          instalmentFrequency: p.instalmentFrequency,
-          instalmentsRemaining: p.instalmentsRemaining,
-          nextPaymentDate: p.nextPaymentDate,
+          instalmentAmount: p.instalment_amount,
+          instalmentFrequency: p.instalment_frequency,
+          instalmentsRemaining: p.instalments_remaining,
+          nextPaymentDate: p.next_payment_date,
         };
       });
 
     const creditCardInputs = allAccounts
-      .filter((a) => a.type === "credit_card" && a.balance > 0)
-      .map((a) => ({
+      .filter((a: any) => a.type === "credit_card" && a.balance > 0)
+      .map((a: any) => ({
         name: a.name,
         balance: a.balance,
         minimumPayment: Math.max(2500, Math.ceil(a.balance * 0.02)), // $25 or 2%
-        dueDate: a.dueDate || 15,
+        dueDate: a.due_date || 15,
       }));
 
     // Base cashflow projection (without purchase)
@@ -407,9 +406,9 @@ export async function POST(req: NextRequest) {
     });
 
     // Strategy 2: Credit card(s)
-    const creditCards = allAccounts.filter((a) => a.type === "credit_card");
+    const creditCards = allAccounts.filter((a: any) => a.type === "credit_card");
     for (const cc of creditCards) {
-      const available = (cc.creditLimit || 0) - cc.balance;
+      const available = (cc.credit_limit || 0) - cc.balance;
       if (available < price) {
         strategies.push({
           name: `${cc.name} (Credit Card)`,
@@ -427,8 +426,8 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const rate = parseFloat(cc.interestRate || "19.99");
-      const dueDay = cc.dueDate || 15;
+      const rate = parseFloat(cc.interest_rate || "19.99");
+      const dueDay = cc.due_date || 15;
 
       // Option A: Pay in full by due date (no interest)
       const dueDate = new Date();
@@ -546,7 +545,7 @@ export async function POST(req: NextRequest) {
         bnplAccount.provider,
         rules,
         price,
-        bnplAccount.availableLimit,
+        bnplAccount.available_limit,
         baseProjectionData,
         startingBalance,
         baseEvents
@@ -556,7 +555,7 @@ export async function POST(req: NextRequest) {
 
     // Calculate savings impact for each strategy
     const totalSavingsTarget = allSavingsGoals.reduce(
-      (sum, g) => sum + (g.targetAmount - g.currentAmount),
+      (sum: number, g: any) => sum + (g.target_amount - g.current_amount),
       0
     );
     for (const strategy of strategies) {
@@ -583,9 +582,9 @@ export async function POST(req: NextRequest) {
     // Build financial snapshot for Gemini
     const financialSnapshot = {
       bankBalance: startingBalance,
-      totalIncome: incomeInputs.reduce((sum, i) => sum + i.amount, 0),
+      totalIncome: incomeInputs.reduce((sum: number, i: any) => sum + i.amount, 0),
       incomeFrequency: incomeInputs[0]?.frequency || "fortnightly",
-      monthlyExpenses: expenseInputs.reduce((sum, e) => {
+      monthlyExpenses: expenseInputs.reduce((sum: number, e: any) => {
         const multiplier =
           e.frequency === "weekly"
             ? 4.33
@@ -599,7 +598,7 @@ export async function POST(req: NextRequest) {
         return sum + e.amount * multiplier;
       }, 0),
       existingBnplCommitments: bnplPaymentInputs.length,
-      creditCardDebt: creditCardInputs.reduce((sum, c) => sum + c.balance, 0),
+      creditCardDebt: creditCardInputs.reduce((sum: number, c: any) => sum + c.balance, 0),
     };
 
     // Get Gemini advice
@@ -619,10 +618,10 @@ export async function POST(req: NextRequest) {
             schedule: s.schedule,
             score: s.score,
           })),
-          savingsGoals: allSavingsGoals.map((g) => ({
+          savingsGoals: allSavingsGoals.map((g: any) => ({
             name: g.name,
-            target: g.targetAmount,
-            current: g.currentAmount,
+            target: g.target_amount,
+            current: g.current_amount,
             deadline: g.deadline,
           })),
           urgency,

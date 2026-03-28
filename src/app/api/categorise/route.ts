@@ -1,7 +1,6 @@
+import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { categoriseTransactions } from "@/lib/gemini";
-import { db, schema } from "@/lib/db";
-import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -34,9 +33,10 @@ export async function POST(request: NextRequest) {
 
 // Save reviewed mappings
 export async function PUT(request: NextRequest) {
+  const supabase = await createClient();
   const body = await request.json();
   const { mappings } = body as {
-    mappings: { rawPattern: string; cleanName: string; category: string }[];
+    mappings: { raw_pattern: string; clean_name: string; category: string }[];
   };
 
   if (!mappings || !Array.isArray(mappings)) {
@@ -49,16 +49,18 @@ export async function PUT(request: NextRequest) {
   const saved = [];
   for (const mapping of mappings) {
     // Check if pattern already exists
-    const existing = await db
-      .select()
-      .from(schema.merchantMappings)
-      .where(eq(schema.merchantMappings.rawPattern, mapping.rawPattern));
+    const { data: existing, error: fetchError } = await supabase
+      .from('merchant_mappings')
+      .select('*')
+      .eq('raw_pattern', mapping.raw_pattern);
+    if (fetchError) throw fetchError;
 
     if (existing.length === 0) {
-      const result = await db
-        .insert(schema.merchantMappings)
-        .values(mapping)
-        .returning();
+      const { data: result, error: insertError } = await supabase
+        .from('merchant_mappings')
+        .insert(mapping)
+        .select();
+      if (insertError) throw insertError;
       saved.push(result[0]);
     }
   }

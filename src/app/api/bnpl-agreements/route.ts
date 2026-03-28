@@ -1,7 +1,6 @@
-import { db } from "@/lib/db";
-import { bnplAgreements } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { toCamel } from "@/lib/db/camel";
 
 // Valid BNPL providers — reject anything else
 const VALID_PROVIDERS = ["afterpay", "zip_pay", "zip_money", "paypal_pay4"] as const;
@@ -15,6 +14,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const provider = searchParams.get("provider");
+    const supabase = await createClient();
 
     // Build query based on whether provider filter is provided
     if (provider) {
@@ -24,19 +24,27 @@ export async function GET(req: NextRequest) {
           { status: 400 }
         );
       }
-      const rows = await db
-        .select()
-        .from(bnplAgreements)
-        .where(eq(bnplAgreements.provider, provider))
-        .orderBy(desc(bnplAgreements.createdAt));
-      return NextResponse.json(rows);
+      const { data, error } = await supabase
+        .from('bnpl_agreements')
+        .select('*')
+        .eq('provider', provider)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      return NextResponse.json(toCamel(data));
     }
 
-    const rows = await db
-      .select()
-      .from(bnplAgreements)
-      .orderBy(desc(bnplAgreements.createdAt));
-    return NextResponse.json(rows);
+    const { data, error } = await supabase
+      .from('bnpl_agreements')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json(toCamel(data));
   } catch (error) {
     console.error("Error fetching BNPL agreements:", error);
     return NextResponse.json(

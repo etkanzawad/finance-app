@@ -1,24 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
-
-let _ai: GoogleGenAI | null = null;
-function getAI(): GoogleGenAI {
-  if (!_ai) {
-    _ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-  }
-  return _ai;
-}
+import { getAI, MODEL } from "@/lib/chat-helpers";
 
 export type TaskType = "categorise" | "advise" | "report" | "cleanup" | "prioritise" | "parse" | "parse_image";
-
-const MODEL_MAP: Record<TaskType, string> = {
-  categorise: "gemini-3-flash-preview",
-  cleanup: "gemini-3-flash-preview",
-  advise: "gemini-3.1-pro-preview",
-  report: "gemini-3.1-pro-preview",
-  prioritise: "gemini-3.1-pro-preview",
-  parse: "gemini-3.1-pro-preview",
-  parse_image: "gemini-3-flash-preview",
-};
 
 export interface CategorisationResult {
   rawDescription: string;
@@ -57,14 +39,16 @@ ${descriptions.map((d, i) => `${i + 1}. ${d}`).join("\n")}
 
 Return ONLY valid JSON array, no markdown formatting.`;
 
-  const response = await getAI().models.generateContent({
-    model: MODEL_MAP.categorise,
-    contents: prompt,
-    config: { responseMimeType: "application/json" },
+  const response = await getAI().chat.completions.create({
+    model: MODEL,
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
   });
 
-  const text = response.text || "";
-  return JSON.parse(text);
+  const text = response.choices[0]?.message?.content || "[]";
+  // The model might wrap array in an object, handle both
+  const parsed = JSON.parse(text);
+  return Array.isArray(parsed) ? parsed : (parsed.transactions || parsed.results || parsed.data || []);
 }
 
 export async function getPurchaseAdvice(context: {
@@ -104,13 +88,13 @@ Return JSON with:
 
 Return ONLY valid JSON, no markdown.`;
 
-  const response = await getAI().models.generateContent({
-    model: MODEL_MAP.advise,
-    contents: prompt,
-    config: { responseMimeType: "application/json" },
+  const response = await getAI().chat.completions.create({
+    model: MODEL,
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
   });
 
-  const text = response.text || "";
+  const text = response.choices[0]?.message?.content || "{}";
   return JSON.parse(text);
 }
 
@@ -155,13 +139,13 @@ Write a casual, helpful monthly report. Be direct. Return JSON with:
 
 Return ONLY valid JSON, no markdown.`;
 
-  const response = await getAI().models.generateContent({
-    model: MODEL_MAP.report,
-    contents: prompt,
-    config: { responseMimeType: "application/json" },
+  const response = await getAI().chat.completions.create({
+    model: MODEL,
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
   });
 
-  const text = response.text || "";
+  const text = response.choices[0]?.message?.content || "{}";
   return JSON.parse(text);
 }
 
@@ -258,15 +242,13 @@ Return JSON with:
 
 Return ONLY valid JSON, no markdown.`;
 
-  const response = await getAI().models.generateContent({
-    model: MODEL_MAP.advise,
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-    },
+  const response = await getAI().chat.completions.create({
+    model: MODEL,
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
   });
 
-  const text = response.text || "";
+  const text = response.choices[0]?.message?.content || "{}";
   return JSON.parse(text);
 }
 
@@ -373,13 +355,13 @@ Return JSON with:
 
 Return ONLY valid JSON, no markdown.`;
 
-  const response = await getAI().models.generateContent({
-    model: MODEL_MAP.advise,
-    contents: prompt,
-    config: { responseMimeType: "application/json" },
+  const response = await getAI().chat.completions.create({
+    model: MODEL,
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
   });
 
-  const text = response.text || "";
+  const text = response.choices[0]?.message?.content || "{}";
   return JSON.parse(text);
 }
 
@@ -446,22 +428,26 @@ Omit "balanceAfter" only if no balance is shown for that transaction.
 
 Return ONLY a valid JSON array of all transactions. No markdown, no explanation, no code blocks.`;
 
-  const response = await getAI().models.generateContent({
-    model: MODEL_MAP.parse,
-    contents: [
+  const response = await getAI().chat.completions.create({
+    model: MODEL,
+    messages: [
       {
         role: "user",
-        parts: [
-          { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
-          { text: prompt },
+        content: [
+          {
+            type: "image_url",
+            image_url: { url: `data:application/pdf;base64,${pdfBase64}` },
+          },
+          { type: "text", text: prompt },
         ],
       },
     ],
-    config: { responseMimeType: "application/json" },
+    response_format: { type: "json_object" },
   });
 
-  const text = response.text || "";
-  return JSON.parse(text);
+  const text = response.choices[0]?.message?.content || "[]";
+  const parsed = JSON.parse(text);
+  return Array.isArray(parsed) ? parsed : (parsed.transactions || parsed.data || []);
 }
 
 export interface BnplScreenshotData {
@@ -495,21 +481,24 @@ Rules:
 
 Return ONLY valid JSON, no markdown, no explanation.`;
 
-  const response = await getAI().models.generateContent({
-    model: MODEL_MAP.parse_image,
-    contents: [
+  const response = await getAI().chat.completions.create({
+    model: MODEL,
+    messages: [
       {
         role: "user",
-        parts: [
-          { inlineData: { mimeType, data: imageBase64 } },
-          { text: prompt },
+        content: [
+          {
+            type: "image_url",
+            image_url: { url: `data:${mimeType};base64,${imageBase64}` },
+          },
+          { type: "text", text: prompt },
         ],
       },
     ],
-    config: { responseMimeType: "application/json" },
+    response_format: { type: "json_object" },
   });
 
-  const text = response.text || "";
+  const text = response.choices[0]?.message?.content || "{}";
   return JSON.parse(text);
 }
 
@@ -554,12 +543,12 @@ Return JSON with:
 
 Return ONLY valid JSON, no markdown.`;
 
-  const response = await getAI().models.generateContent({
-    model: MODEL_MAP.prioritise,
-    contents: prompt,
-    config: { responseMimeType: "application/json" },
+  const response = await getAI().chat.completions.create({
+    model: MODEL,
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
   });
 
-  const text = response.text || "";
+  const text = response.choices[0]?.message?.content || "{}";
   return JSON.parse(text);
 }

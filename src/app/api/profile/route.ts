@@ -1,20 +1,21 @@
-import { db } from "@/lib/db";
-import { settings } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 // GET profile settings (name)
 export async function GET() {
-  const rows = await db
-    .select()
-    .from(settings)
-    .where(eq(settings.key, "profile"));
+  const supabase = await createClient();
 
-  if (rows.length === 0) {
+  const { data, error } = await supabase
+    .from('settings')
+    .select('*')
+    .eq('key', 'profile');
+  if (error) throw error;
+
+  if (data.length === 0) {
     return NextResponse.json({ name: "" });
   }
 
-  const profile = JSON.parse(rows[0].value);
+  const profile = JSON.parse(data[0].value);
   return NextResponse.json({
     name: profile.name || "",
   });
@@ -22,14 +23,16 @@ export async function GET() {
 
 // PUT update profile (name)
 export async function PUT(req: NextRequest) {
+  const supabase = await createClient();
   const body = await req.json();
   const { name } = body;
 
   // Get existing profile
-  const rows = await db
-    .select()
-    .from(settings)
-    .where(eq(settings.key, "profile"));
+  const { data: rows, error: fetchError } = await supabase
+    .from('settings')
+    .select('*')
+    .eq('key', 'profile');
+  if (fetchError) throw fetchError;
 
   const existing = rows.length > 0 ? JSON.parse(rows[0].value) : {};
 
@@ -42,11 +45,10 @@ export async function PUT(req: NextRequest) {
   // Remove legacy PIN data if present
   delete updated.pin;
 
-  if (rows.length === 0) {
-    await db.insert(settings).values({ key: "profile", value: JSON.stringify(updated) });
-  } else {
-    await db.update(settings).set({ value: JSON.stringify(updated) }).where(eq(settings.key, "profile"));
-  }
+  const { error } = await supabase
+    .from('settings')
+    .upsert({ key: 'profile', value: JSON.stringify(updated) }, { onConflict: 'key' });
+  if (error) throw error;
 
   return NextResponse.json({ success: true, name: updated.name || "" });
 }

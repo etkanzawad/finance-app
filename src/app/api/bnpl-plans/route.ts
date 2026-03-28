@@ -1,7 +1,6 @@
-import { db } from "@/lib/db";
-import { bnplPlans, bnplAccounts } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { toCamel } from "@/lib/db/camel";
 
 function advanceDate(dateStr: string, frequency: string): string {
   const date = new Date(dateStr + "T00:00:00");
@@ -20,25 +19,31 @@ function advanceDate(dateStr: string, frequency: string): string {
 }
 
 export async function GET() {
-  const plans = await db
-    .select({
-      id: bnplPlans.id,
-      bnplAccountId: bnplPlans.bnplAccountId,
-      itemName: bnplPlans.itemName,
-      totalAmount: bnplPlans.totalAmount,
-      instalmentAmount: bnplPlans.instalmentAmount,
-      instalmentFrequency: bnplPlans.instalmentFrequency,
-      instalmentsTotal: bnplPlans.instalmentsTotal,
-      instalmentsRemaining: bnplPlans.instalmentsRemaining,
-      nextPaymentDate: bnplPlans.nextPaymentDate,
-      createdAt: bnplPlans.createdAt,
-      provider: bnplAccounts.provider,
-      spendingLimit: bnplAccounts.spendingLimit,
-      availableLimit: bnplAccounts.availableLimit,
-    })
-    .from(bnplPlans)
-    .innerJoin(bnplAccounts, eq(bnplPlans.bnplAccountId, bnplAccounts.id))
-    .orderBy(bnplPlans.nextPaymentDate);
+  const supabase = await createClient();
+
+  const { data: plansRaw, error } = await supabase
+    .from("bnpl_plans")
+    .select("*, bnpl_accounts!inner(*)")
+    .order("next_payment_date", { ascending: true });
+
+  if (error) throw error;
+
+  // Flatten the joined data
+  const plans = plansRaw.map((p: any) => ({
+    id: p.id,
+    bnplAccountId: p.bnpl_account_id,
+    itemName: p.item_name,
+    totalAmount: p.total_amount,
+    instalmentAmount: p.instalment_amount,
+    instalmentFrequency: p.instalment_frequency,
+    instalmentsTotal: p.instalments_total,
+    instalmentsRemaining: p.instalments_remaining,
+    nextPaymentDate: p.next_payment_date,
+    createdAt: p.created_at,
+    provider: p.bnpl_accounts.provider,
+    spendingLimit: p.bnpl_accounts.spending_limit,
+    availableLimit: p.bnpl_accounts.available_limit,
+  }));
 
   // Auto-advance plans whose payment date has passed
   const today = new Date().toISOString().split("T")[0];
@@ -58,16 +63,21 @@ export async function GET() {
     if (changed) {
       if (remaining === 0) {
         // Fully paid off — remove the plan
-        await db.delete(bnplPlans).where(eq(bnplPlans.id, plan.id));
+        const { error: deleteError } = await supabase
+          .from("bnpl_plans")
+          .delete()
+          .eq("id", plan.id);
+        if (deleteError) throw deleteError;
       } else {
         // Update with new remaining count and next date
-        await db
-          .update(bnplPlans)
-          .set({
-            instalmentsRemaining: remaining,
-            nextPaymentDate: nextDate,
+        const { error: updateError } = await supabase
+          .from("bnpl_plans")
+          .update({
+            instalments_remaining: remaining,
+            next_payment_date: nextDate,
           })
-          .where(eq(bnplPlans.id, plan.id));
+          .eq("id", plan.id);
+        if (updateError) throw updateError;
       }
       // Update in-memory for the response
       plan.instalmentsRemaining = remaining;
@@ -76,25 +86,31 @@ export async function GET() {
   }
 
   // Filter out completed plans from response
-  const activePlans = plans.filter((p) => p.instalmentsRemaining > 0);
+  const activePlans = plans.filter((p: any) => p.instalmentsRemaining > 0);
 
   return NextResponse.json(activePlans);
 }
 
 export async function POST(req: NextRequest) {
+  const supabase = await createClient();
   const body = await req.json();
-  const result = await db
-    .insert(bnplPlans)
-    .values({
-      bnplAccountId: body.bnplAccountId,
-      itemName: body.itemName,
-      totalAmount: body.totalAmount,
-      instalmentAmount: body.instalmentAmount,
-      instalmentFrequency: body.instalmentFrequency,
-      instalmentsTotal: body.instalmentsTotal,
-      instalmentsRemaining: body.instalmentsRemaining,
-      nextPaymentDate: body.nextPaymentDate,
+
+  const { data, error } = await supabase
+    .from("bnpl_plans")
+    .insert({
+      bnpl_account_id: body.bnplAccountId,
+      item_name: body.itemName,
+      total_amount: body.totalAmount,
+      instalment_amount: body.instalmentAmount,
+      instalment_frequency: body.instalmentFrequency,
+      instalments_total: body.instalmentsTotal,
+      instalments_remaining: body.instalmentsRemaining,
+      next_payment_date: body.nextPaymentDate,
     })
-    .returning();
-  return NextResponse.json(result[0], { status: 201 });
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return NextResponse.json(toCamel(data), { status: 201 });
 }

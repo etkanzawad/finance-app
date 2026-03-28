@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { eq, and, sql } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
 import { getAffordabilityAdvice } from "@/lib/gemini";
 import { calculateSafeToSpend } from "@/lib/cashflow";
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const { wishlistItemId } = await request.json();
 
     if (!wishlistItemId) {
@@ -16,46 +16,37 @@ export async function POST(request: NextRequest) {
     }
 
     const [
-      itemRows,
-      incomes,
-      bankAccounts,
-      creditCards,
-      bnplAccountRows,
-      bnplPlanRows,
-      fixedExpenseRows,
+      itemResult,
+      incomesResult,
+      bankAccountsResult,
+      creditCardsResult,
+      bnplAccountsResult,
+      bnplPlansResult,
+      fixedExpensesResult,
     ] = await Promise.all([
-      db
-        .select()
-        .from(schema.wishlistItems)
-        .where(eq(schema.wishlistItems.id, wishlistItemId)),
-      db.select().from(schema.income),
-      db.select().from(schema.accounts).where(eq(schema.accounts.type, "bank")),
-      db
-        .select()
-        .from(schema.accounts)
-        .where(eq(schema.accounts.type, "credit_card")),
-      db
-        .select()
-        .from(schema.bnplAccounts)
-        .where(eq(schema.bnplAccounts.isActive, true)),
-      db
-        .select()
-        .from(schema.bnplPlans)
-        .innerJoin(
-          schema.bnplAccounts,
-          eq(schema.bnplPlans.bnplAccountId, schema.bnplAccounts.id)
-        )
-        .where(
-          and(
-            eq(schema.bnplAccounts.isActive, true),
-            sql`${schema.bnplPlans.instalmentsRemaining} > 0`
-          )
-        ),
-      db
-        .select()
-        .from(schema.fixedExpenses)
-        .where(eq(schema.fixedExpenses.isActive, true)),
+      supabase
+        .from("wishlist_items")
+        .select("*")
+        .eq("id", wishlistItemId),
+      supabase.from("income").select("*"),
+      supabase.from("accounts").select("*").eq("type", "bank"),
+      supabase.from("accounts").select("*").eq("type", "credit_card"),
+      supabase.from("bnpl_accounts").select("*").eq("is_active", true),
+      supabase
+        .from("bnpl_plans")
+        .select("*, bnpl_accounts!inner(*)")
+        .gt("instalments_remaining", 0)
+        .eq("bnpl_accounts.is_active", true),
+      supabase.from("fixed_expenses").select("*").eq("is_active", true),
     ]);
+
+    const itemRows = itemResult.data || [];
+    const incomes = incomesResult.data || [];
+    const bankAccounts = bankAccountsResult.data || [];
+    const creditCards = creditCardsResult.data || [];
+    const bnplAccountRows = bnplAccountsResult.data || [];
+    const bnplPlanRows = bnplPlansResult.data || [];
+    const fixedExpenseRows = fixedExpensesResult.data || [];
 
     const item = itemRows[0];
     if (!item) {
@@ -67,25 +58,25 @@ export async function POST(request: NextRequest) {
 
     // Calculate financial snapshot
     const totalBankBalance = bankAccounts.reduce(
-      (sum, a) => sum + a.balance,
+      (sum: number, a: any) => sum + a.balance,
       0
     );
     const totalCreditCardDebt = creditCards.reduce(
-      (sum, a) => sum + a.balance,
+      (sum: number, a: any) => sum + a.balance,
       0
     );
     const totalBnplDebt = bnplPlanRows.reduce(
-      (sum, p) =>
+      (sum: number, p: any) =>
         sum +
-        p.bnpl_plans.instalmentAmount * p.bnpl_plans.instalmentsRemaining,
+        p.instalment_amount * p.instalments_remaining,
       0
     );
-    const totalMonthlyIncome = incomes.reduce((sum, i) => {
+    const totalMonthlyIncome = incomes.reduce((sum: number, i: any) => {
       if (i.frequency === "weekly") return sum + i.amount * 4.33;
       if (i.frequency === "fortnightly") return sum + i.amount * 2.17;
       return sum + i.amount;
     }, 0);
-    const totalMonthlyExpenses = fixedExpenseRows.reduce((sum, e) => {
+    const totalMonthlyExpenses = fixedExpenseRows.reduce((sum: number, e: any) => {
       if (e.frequency === "weekly") return sum + e.amount * 4.33;
       if (e.frequency === "fortnightly") return sum + e.amount * 2.17;
       if (e.frequency === "quarterly") return sum + e.amount / 3;
@@ -99,38 +90,38 @@ export async function POST(request: NextRequest) {
     if (incomes.length > 0 && bankAccounts.length > 0) {
       const sts = calculateSafeToSpend({
         currentBalance: totalBankBalance,
-        incomes: incomes.map((i) => ({
+        incomes: incomes.map((i: any) => ({
           name: i.name,
           amount: i.amount,
           frequency: i.frequency,
-          nextPayDate: i.nextPayDate,
+          nextPayDate: i.next_pay_date,
         })),
-        expenses: fixedExpenseRows.map((e) => ({
+        expenses: fixedExpenseRows.map((e: any) => ({
           name: e.name,
           amount: e.amount,
           frequency: e.frequency,
-          nextDueDate: e.nextDueDate,
+          nextDueDate: e.next_due_date,
         })),
-        bnplPayments: bnplPlanRows.map((p) => {
+        bnplPayments: bnplPlanRows.map((p: any) => {
           const account = bnplAccountRows.find(
-            (a) => a.id === p.bnpl_plans.bnplAccountId
+            (a: any) => a.id === p.bnpl_account_id
           );
           return {
-            itemName: p.bnpl_plans.itemName,
+            itemName: p.item_name,
             provider: account?.provider || "unknown",
-            instalmentAmount: p.bnpl_plans.instalmentAmount,
-            instalmentFrequency: p.bnpl_plans.instalmentFrequency,
-            instalmentsRemaining: p.bnpl_plans.instalmentsRemaining,
-            nextPaymentDate: p.bnpl_plans.nextPaymentDate,
+            instalmentAmount: p.instalment_amount,
+            instalmentFrequency: p.instalment_frequency,
+            instalmentsRemaining: p.instalments_remaining,
+            nextPaymentDate: p.next_payment_date,
           };
         }),
         creditCards: creditCards
-          .filter((c) => c.balance > 0)
-          .map((c) => ({
+          .filter((c: any) => c.balance > 0)
+          .map((c: any) => ({
             name: c.name,
             balance: c.balance,
             minimumPayment: Math.max(2500, Math.ceil(c.balance * 0.02)),
-            dueDate: c.dueDate || 15,
+            dueDate: c.due_date || 15,
           })),
       });
       safeToSpend = sts.safeToSpend;
@@ -139,35 +130,35 @@ export async function POST(request: NextRequest) {
 
     // Build Zip-specific context
     const zipAccount = bnplAccountRows.find(
-      (a) => a.provider === "zip_pay" || a.provider === "zip_money"
+      (a: any) => a.provider === "zip_pay" || a.provider === "zip_money"
     );
     const zipContext = zipAccount
       ? {
           currentBalance:
-            (zipAccount.spendingLimit - zipAccount.availableLimit) / 100,
-          spendingLimit: zipAccount.spendingLimit / 100,
-          availableLimit: zipAccount.availableLimit / 100,
+            (zipAccount.spending_limit - zipAccount.available_limit) / 100,
+          spendingLimit: zipAccount.spending_limit / 100,
+          availableLimit: zipAccount.available_limit / 100,
         }
       : null;
 
     // Build existing BNPL plans context
-    const existingPlans = bnplPlanRows.map((p) => {
+    const existingPlans = bnplPlanRows.map((p: any) => {
       const account = bnplAccountRows.find(
-        (a) => a.id === p.bnpl_plans.bnplAccountId
+        (a: any) => a.id === p.bnpl_account_id
       );
       const remaining =
-        (p.bnpl_plans.instalmentAmount * p.bnpl_plans.instalmentsRemaining) /
+        (p.instalment_amount * p.instalments_remaining) /
         100;
       // Estimate monthly payment based on frequency
-      let monthlyPayment = p.bnpl_plans.instalmentAmount / 100;
-      if (p.bnpl_plans.instalmentFrequency === "weekly")
+      let monthlyPayment = p.instalment_amount / 100;
+      if (p.instalment_frequency === "weekly")
         monthlyPayment *= 4.33;
-      else if (p.bnpl_plans.instalmentFrequency === "fortnightly")
+      else if (p.instalment_frequency === "fortnightly")
         monthlyPayment *= 2.17;
 
       return {
         provider: account?.provider || "unknown",
-        itemName: p.bnpl_plans.itemName,
+        itemName: p.item_name,
         remainingAmount: remaining,
         monthlyPayment,
       };

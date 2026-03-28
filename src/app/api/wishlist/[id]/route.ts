@@ -1,8 +1,7 @@
-import { db } from "@/lib/db";
-import { wishlistItems } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { format } from "date-fns";
+import { toCamel } from "@/lib/db/camel";
 
 export async function PUT(
   req: NextRequest,
@@ -10,6 +9,7 @@ export async function PUT(
 ) {
   const { id } = await params;
   const body = await req.json();
+  const supabase = await createClient();
 
   const updates: Record<string, unknown> = {
     name: body.name,
@@ -24,24 +24,28 @@ export async function PUT(
   if (body.status) {
     updates.status = body.status;
     if (body.status === "purchased") {
-      updates.datePurchased = format(new Date(), "yyyy-MM-dd");
+      updates.date_purchased = format(new Date(), "yyyy-MM-dd");
     }
   }
 
   if (body.linkedGoalId !== undefined) {
-    updates.linkedGoalId = body.linkedGoalId;
+    updates.linked_goal_id = body.linkedGoalId;
   }
 
-  const result = await db
-    .update(wishlistItems)
-    .set(updates)
-    .where(eq(wishlistItems.id, Number(id)))
-    .returning();
+  const { data, error } = await supabase
+    .from('wishlist_items')
+    .update(updates)
+    .eq('id', Number(id))
+    .select();
 
-  if (result.length === 0) {
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (!data || data.length === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json(result[0]);
+  return NextResponse.json(toCamel(data[0]));
 }
 
 export async function DELETE(
@@ -49,6 +53,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  await db.delete(wishlistItems).where(eq(wishlistItems.id, Number(id)));
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('wishlist_items')
+    .delete()
+    .eq('id', Number(id));
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ success: true });
 }

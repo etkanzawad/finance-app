@@ -1,10 +1,10 @@
-import { db } from "@/lib/db";
-import { transactions, bnplPlans, bnplAccounts } from "@/lib/db/schema";
-import { eq, and, gte, lt, sql } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
 import { generateMonthlyReport } from "@/lib/gemini";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
+  const supabase = await createClient();
+
   const { searchParams } = new URL(req.url);
   const month = searchParams.get("month"); // "2025-01" format
 
@@ -28,16 +28,22 @@ export async function GET(req: NextRequest) {
   const prevStartDate = `${prevMonth}-01`;
 
   // Get transactions for this month
-  const monthTxns = await db
-    .select()
-    .from(transactions)
-    .where(and(gte(transactions.date, startDate), lt(transactions.date, endDate)));
+  const { data: monthTxns, error: monthError } = await supabase
+    .from("transactions")
+    .select("*")
+    .gte("date", startDate)
+    .lt("date", endDate);
+
+  if (monthError) throw monthError;
 
   // Get transactions for previous month
-  const prevMonthTxns = await db
-    .select()
-    .from(transactions)
-    .where(and(gte(transactions.date, prevStartDate), lt(transactions.date, startDate)));
+  const { data: prevMonthTxns, error: prevError } = await supabase
+    .from("transactions")
+    .select("*")
+    .gte("date", prevStartDate)
+    .lt("date", startDate);
+
+  if (prevError) throw prevError;
 
   // Calculate category totals
   const categoryTotals: Record<string, number> = {};
@@ -45,7 +51,7 @@ export async function GET(req: NextRequest) {
   let totalExpenses = 0;
 
   for (const txn of monthTxns) {
-    if (txn.isIncome || txn.amount > 0) {
+    if (txn.is_income || txn.amount > 0) {
       totalIncome += Math.abs(txn.amount);
     } else {
       totalExpenses += Math.abs(txn.amount);
@@ -57,23 +63,21 @@ export async function GET(req: NextRequest) {
   // Previous month totals
   const previousMonthTotals: Record<string, number> = {};
   for (const txn of prevMonthTxns) {
-    if (!txn.isIncome && txn.amount < 0) {
+    if (!txn.is_income && txn.amount < 0) {
       const cat = txn.category || "Uncategorised";
       previousMonthTotals[cat] = (previousMonthTotals[cat] || 0) + Math.abs(txn.amount);
     }
   }
 
   // BNPL exposure
-  const plans = await db
-    .select({
-      instalmentAmount: bnplPlans.instalmentAmount,
-      instalmentsRemaining: bnplPlans.instalmentsRemaining,
-    })
-    .from(bnplPlans)
-    .innerJoin(bnplAccounts, eq(bnplPlans.bnplAccountId, bnplAccounts.id));
+  const { data: plans, error: bnplError } = await supabase
+    .from("bnpl_plans")
+    .select("instalment_amount, instalments_remaining, bnpl_accounts!inner(*)")
+
+  if (bnplError) throw bnplError;
 
   const bnplExposure = plans.reduce(
-    (sum, p) => sum + p.instalmentAmount * p.instalmentsRemaining,
+    (sum: number, p: any) => sum + p.instalment_amount * p.instalments_remaining,
     0
   );
 

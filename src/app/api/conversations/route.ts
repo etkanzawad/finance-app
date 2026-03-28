@@ -1,18 +1,16 @@
+import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { desc, sql } from "drizzle-orm";
+import { toCamel } from "@/lib/db/camel";
 
-// GET — list all conversations (id, title, updatedAt), ordered by updatedAt desc
+// GET -- list all conversations (id, title, updated_at), ordered by updated_at desc
 export async function GET() {
-  const rows = await db
-    .select({
-      id: schema.conversations.id,
-      title: schema.conversations.title,
-      updatedAt: schema.conversations.updatedAt,
-      messages: schema.conversations.messages,
-    })
-    .from(schema.conversations)
-    .orderBy(desc(schema.conversations.updatedAt));
+  const supabase = await createClient();
+
+  const { data: rows, error } = await supabase
+    .from('conversations')
+    .select('id, title, updated_at, messages')
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
 
   // Include a preview of the last message
   const result = rows.map((row) => {
@@ -26,7 +24,7 @@ export async function GET() {
     return {
       id: row.id,
       title: row.title,
-      updatedAt: row.updatedAt,
+      updatedAt: row.updated_at,
       lastMessage,
     };
   });
@@ -34,8 +32,9 @@ export async function GET() {
   return NextResponse.json(result);
 }
 
-// POST — create a new conversation { title, messages } → returns the new row
+// POST -- create a new conversation { title, messages } -> returns the new row
 export async function POST(req: NextRequest) {
+  const supabase = await createClient();
   const body = await req.json();
   const { title, messages } = body;
 
@@ -43,14 +42,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "title and messages are required" }, { status: 400 });
   }
 
-  const [row] = await db
-    .insert(schema.conversations)
-    .values({
+  const { data, error } = await supabase
+    .from('conversations')
+    .insert({
       title,
       messages: typeof messages === "string" ? messages : JSON.stringify(messages),
-      updatedAt: sql`now()`,
+      updated_at: new Date().toISOString(),
     })
-    .returning();
+    .select();
+  if (error) throw error;
 
-  return NextResponse.json(row);
+  return NextResponse.json(toCamel(data[0]));
 }

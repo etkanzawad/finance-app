@@ -1,8 +1,6 @@
-import { db } from "@/lib/db";
-import { bnplAgreements } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { toCamel } from "@/lib/db/camel";
 
 export async function DELETE(
   _req: NextRequest,
@@ -19,23 +17,26 @@ export async function DELETE(
       );
     }
 
-    // Fetch the agreement to get the storage path
-    const agreement = await db
-      .select()
-      .from(bnplAgreements)
-      .where(eq(bnplAgreements.id, agreementId));
+    const supabase = await createClient();
 
-    if (agreement.length === 0) {
+    // Fetch the agreement to get the storage path
+    const { data: agreement, error: fetchError } = await supabase
+      .from('bnpl_agreements')
+      .select('*')
+      .eq('id', agreementId);
+
+    if (fetchError) {
+      return NextResponse.json({ error: fetchError.message }, { status: 500 });
+    }
+
+    if (!agreement || agreement.length === 0) {
       return NextResponse.json(
         { error: "Agreement not found" },
         { status: 404 }
       );
     }
 
-    const storagePath = agreement[0].storagePath;
-
-    // Initialize Supabase client
-    const supabase = await createClient();
+    const storagePath = agreement[0].storage_path;
 
     // Delete file from Supabase Storage
     const { error: storageError } = await supabase
@@ -50,7 +51,14 @@ export async function DELETE(
     }
 
     // Delete record from database
-    await db.delete(bnplAgreements).where(eq(bnplAgreements.id, agreementId));
+    const { error: deleteError } = await supabase
+      .from('bnpl_agreements')
+      .delete()
+      .eq('id', agreementId);
+
+    if (deleteError) {
+      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -77,19 +85,25 @@ export async function GET(
       );
     }
 
-    const agreement = await db
-      .select()
-      .from(bnplAgreements)
-      .where(eq(bnplAgreements.id, agreementId));
+    const supabase = await createClient();
 
-    if (agreement.length === 0) {
+    const { data: agreement, error } = await supabase
+      .from('bnpl_agreements')
+      .select('*')
+      .eq('id', agreementId);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (!agreement || agreement.length === 0) {
       return NextResponse.json(
         { error: "Agreement not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(agreement[0]);
+    return NextResponse.json(toCamel(agreement[0]));
   } catch (error) {
     console.error("Error fetching BNPL agreement:", error);
     return NextResponse.json(

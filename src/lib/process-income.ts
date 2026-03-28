@@ -1,5 +1,4 @@
-import { db, schema } from "@/lib/db";
-import { eq, sql } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
 import { format, addMonths, addWeeks } from "date-fns";
 
 /**
@@ -21,52 +20,53 @@ export function processIncome(): Promise<string[]> {
 }
 
 async function _processIncome(): Promise<string[]> {
+  const supabase = await createClient();
   const today = format(new Date(), "yyyy-MM-dd");
 
-  const incomes = await db.select().from(schema.income);
+  const { data: incomes } = await supabase.from("income").select("*");
+  if (!incomes) return [];
+
   const processed: string[] = [];
 
   for (const inc of incomes) {
     // Skip if no account linked
-    if (!inc.accountId) continue;
+    if (!inc.account_id) continue;
 
     // Skip if nextPayDate is in the future
-    if (inc.nextPayDate > today) continue;
+    if (inc.next_pay_date > today) continue;
 
     // Skip if we already processed this exact date
-    if (inc.lastProcessedDate === inc.nextPayDate) {
+    if (inc.last_processed_date === inc.next_pay_date) {
       // Date already processed but nextPayDate wasn't advanced (shouldn't happen, but safety check)
       // Advance it now
-      const newNextDate = advanceDate(inc.nextPayDate, inc.frequency);
-      await db
-        .update(schema.income)
-        .set({ nextPayDate: newNextDate })
-        .where(eq(schema.income.id, inc.id));
+      const newNextDate = advanceDate(inc.next_pay_date, inc.frequency);
+      await supabase
+        .from("income")
+        .update({ next_pay_date: newNextDate })
+        .eq("id", inc.id);
       continue;
     }
 
     // Process all missed pay dates up to today (handles catching up if app wasn't opened for a while)
-    let currentPayDate = inc.nextPayDate;
+    let currentPayDate = inc.next_pay_date;
     while (currentPayDate <= today) {
-      // Credit the bank account
-      await db
-        .update(schema.accounts)
-        .set({
-          balance: sql`${schema.accounts.balance} + ${inc.amount}`,
-        })
-        .where(eq(schema.accounts.id, inc.accountId));
+      // Credit the bank account (atomic increment via RPC)
+      await supabase.rpc("increment_balance", {
+        account_id_param: inc.account_id,
+        amount_param: inc.amount,
+      });
 
       // Create a transaction record
-      await db.insert(schema.transactions).values({
-        accountId: inc.accountId,
+      await supabase.from("transactions").insert({
+        account_id: inc.account_id,
         date: currentPayDate,
-        rawDescription: `Income: ${inc.name}`,
-        cleanDescription: inc.name,
+        raw_description: `Income: ${inc.name}`,
+        clean_description: inc.name,
         amount: inc.amount,
         category: "Income",
-        isIncome: true,
-        isReviewed: true,
-        statementMonth: currentPayDate.substring(0, 7),
+        is_income: true,
+        is_reviewed: true,
+        statement_month: currentPayDate.substring(0, 7),
       });
 
       processed.push(`${inc.name} on ${currentPayDate}`);
@@ -76,13 +76,13 @@ async function _processIncome(): Promise<string[]> {
     }
 
     // Update the income record with next pay date and last processed marker
-    await db
-      .update(schema.income)
-      .set({
-        nextPayDate: currentPayDate,
-        lastProcessedDate: today,
+    await supabase
+      .from("income")
+      .update({
+        next_pay_date: currentPayDate,
+        last_processed_date: today,
       })
-      .where(eq(schema.income.id, inc.id));
+      .eq("id", inc.id);
   }
 
   return processed;

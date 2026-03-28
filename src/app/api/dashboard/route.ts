@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { desc, eq, gte, and, lt, sql, or } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
+import { toCamel } from "@/lib/db/camel";
 import { calculateSafeToSpend } from "@/lib/cashflow";
 import { processIncome } from "@/lib/process-income";
 import { format, addDays, startOfMonth } from "date-fns";
@@ -10,90 +10,85 @@ export async function GET() {
     // Process any due income payments before loading dashboard data
     await processIncome();
 
+    const supabase = await createClient();
+
     const today = format(new Date(), "yyyy-MM-dd");
     const in14Days = format(addDays(new Date(), 14), "yyyy-MM-dd");
     const monthStart = format(startOfMonth(new Date()), "yyyy-MM-dd");
 
     // Fetch all needed data in parallel
     const [
-      incomes,
-      bankAccounts,
-      creditCards,
-      bnplPlans,
-      fixedExpenses,
-      recentTransactions,
-      monthlySpending,
-      wishlistItemsData,
+      incomesRes,
+      bankAccountsRes,
+      creditCardsRes,
+      bnplPlansRes,
+      fixedExpensesRes,
+      recentTransactionsRes,
+      monthlySpendingRes,
+      wishlistItemsRes,
     ] = await Promise.all([
-      db.select().from(schema.income),
-      db
-        .select()
-        .from(schema.accounts)
-        .where(eq(schema.accounts.type, "bank")),
-      db
-        .select()
-        .from(schema.accounts)
-        .where(eq(schema.accounts.type, "credit_card")),
-      db
-        .select({
-          id: schema.bnplPlans.id,
-          itemName: schema.bnplPlans.itemName,
-          instalmentAmount: schema.bnplPlans.instalmentAmount,
-          instalmentFrequency: schema.bnplPlans.instalmentFrequency,
-          instalmentsRemaining: schema.bnplPlans.instalmentsRemaining,
-          nextPaymentDate: schema.bnplPlans.nextPaymentDate,
-          provider: schema.bnplAccounts.provider,
-        })
-        .from(schema.bnplPlans)
-        .innerJoin(
-          schema.bnplAccounts,
-          eq(schema.bnplPlans.bnplAccountId, schema.bnplAccounts.id)
-        )
-        .where(
-          and(
-            eq(schema.bnplAccounts.isActive, true),
-            sql`${schema.bnplPlans.instalmentsRemaining} > 0`
-          )
-        ),
-      db
-        .select()
-        .from(schema.fixedExpenses)
-        .where(eq(schema.fixedExpenses.isActive, true)),
-      db
-        .select()
-        .from(schema.transactions)
-        .orderBy(desc(schema.transactions.date), desc(schema.transactions.id))
+      supabase.from("income").select("*"),
+      supabase.from("accounts").select("*").eq("type", "bank"),
+      supabase.from("accounts").select("*").eq("type", "credit_card"),
+      supabase
+        .from("bnpl_plans")
+        .select("*, bnpl_accounts!inner(*)")
+        .gt("instalments_remaining", 0)
+        .eq("bnpl_accounts.is_active", true),
+      supabase
+        .from("fixed_expenses")
+        .select("*")
+        .eq("is_active", true),
+      supabase
+        .from("transactions")
+        .select("*")
+        .order("date", { ascending: false })
+        .order("id", { ascending: false })
         .limit(10),
-      db
-        .select({
-          category: schema.transactions.category,
-          total: sql<number>`SUM(ABS(${schema.transactions.amount}))`,
-        })
-        .from(schema.transactions)
-        .where(
-          and(
-            gte(schema.transactions.date, monthStart),
-            lt(schema.transactions.amount, 0),
-            eq(schema.transactions.isIncome, false)
-          )
-        )
-        .groupBy(schema.transactions.category),
-      db
-        .select()
-        .from(schema.wishlistItems)
-        .where(
-          or(
-            eq(schema.wishlistItems.status, "wanted"),
-            eq(schema.wishlistItems.status, "saving")
-          )
-        )
-        .orderBy(schema.wishlistItems.priority)
+      supabase.rpc("monthly_spending_by_category", {
+        start_date: monthStart,
+      }),
+      supabase
+        .from("wishlist_items")
+        .select("*")
+        .in("status", ["wanted", "saving"])
+        .order("priority", { ascending: true })
         .limit(5),
     ]);
 
+    // Check for errors
+    if (incomesRes.error) throw incomesRes.error;
+    if (bankAccountsRes.error) throw bankAccountsRes.error;
+    if (creditCardsRes.error) throw creditCardsRes.error;
+    if (bnplPlansRes.error) throw bnplPlansRes.error;
+    if (fixedExpensesRes.error) throw fixedExpensesRes.error;
+    if (recentTransactionsRes.error) throw recentTransactionsRes.error;
+    if (monthlySpendingRes.error) throw monthlySpendingRes.error;
+    if (wishlistItemsRes.error) throw wishlistItemsRes.error;
+
+    const incomes = incomesRes.data;
+    const bankAccounts = bankAccountsRes.data;
+    const creditCards = creditCardsRes.data;
+    const bnplPlansRaw = bnplPlansRes.data;
+    const fixedExpenses = fixedExpensesRes.data;
+    const recentTransactions = recentTransactionsRes.data;
+    const monthlySpending = monthlySpendingRes.data;
+    const wishlistItemsData = wishlistItemsRes.data;
+
+    // Flatten bnpl_plans join result to camelCase
+    const bnplPlans = bnplPlansRaw.map((p: any) => ({
+      id: p.id,
+      itemName: p.item_name,
+      instalmentAmount: p.instalment_amount,
+      instalmentFrequency: p.instalment_frequency,
+      instalmentsRemaining: p.instalments_remaining,
+      nextPaymentDate: p.next_payment_date,
+      provider: p.bnpl_accounts.provider,
+    }));
+
     // Calculate total bank balance
     const totalBankBalance = bankAccounts.reduce(
-      (sum, a) => sum + a.balance,
+      (sum: number, a: any) => sum + a.balance,
       0
     );
 
@@ -104,19 +99,19 @@ export async function GET() {
       currentAccountNames.some((kw) => name.toLowerCase().includes(kw));
 
     const expenseAccountBalance = bankAccounts
-      .filter((a) => isCurrentAccount(a.name))
-      .reduce((sum, a) => sum + a.balance, 0);
+      .filter((a: any) => isCurrentAccount(a.name))
+      .reduce((sum: number, a: any) => sum + a.balance, 0);
     const availableBalance = bankAccounts
-      .filter((a) => !isCurrentAccount(a.name))
-      .reduce((sum, a) => sum + a.balance, 0);
+      .filter((a: any) => !isCurrentAccount(a.name))
+      .reduce((sum: number, a: any) => sum + a.balance, 0);
 
     // Calculate net position: bank balances minus credit card balances minus BNPL outstanding
     const totalCreditCardDebt = creditCards.reduce(
-      (sum, a) => sum + a.balance,
+      (sum: number, a: any) => sum + a.balance,
       0
     );
     const totalBnplDebt = bnplPlans.reduce(
-      (sum, p) => sum + p.instalmentAmount * p.instalmentsRemaining,
+      (sum: number, p: any) => sum + p.instalmentAmount * p.instalmentsRemaining,
       0
     );
     const netPosition = totalBankBalance - totalCreditCardDebt - totalBnplDebt;
@@ -126,14 +121,14 @@ export async function GET() {
     // so they are NOT deducted from the available balance
     const safeToSpendResult = calculateSafeToSpend({
       currentBalance: availableBalance,
-      incomes: incomes.map((i) => ({
+      incomes: incomes.map((i: any) => ({
         name: i.name,
         amount: i.amount,
         frequency: i.frequency,
-        nextPayDate: i.nextPayDate,
+        nextPayDate: i.next_pay_date,
       })),
       expenses: [],
-      bnplPayments: bnplPlans.map((p) => ({
+      bnplPayments: bnplPlans.map((p: any) => ({
         itemName: p.itemName,
         provider: p.provider,
         instalmentAmount: p.instalmentAmount,
@@ -146,7 +141,7 @@ export async function GET() {
 
     // Upcoming payments in next 14 days (from the safeToSpend result, filter to 14 days)
     const upcomingPayments = safeToSpendResult.upcomingExpenses.filter(
-      (e) => e.date <= in14Days
+      (e: any) => e.date <= in14Days
     );
 
     // Also add expenses beyond the pay cycle but within 14 days
@@ -155,11 +150,11 @@ export async function GET() {
 
     for (const exp of fixedExpenses) {
       // Simple check: if nextDueDate is within 14 days
-      if (exp.nextDueDate >= today && exp.nextDueDate <= in14Days) {
+      if (exp.next_due_date >= today && exp.next_due_date <= in14Days) {
         allUpcoming.push({
           name: exp.name,
           amount: exp.amount,
-          date: exp.nextDueDate,
+          date: exp.next_due_date,
           type: "expense",
         });
       }
@@ -181,15 +176,15 @@ export async function GET() {
     }
 
     for (const cc of creditCards) {
-      if (cc.dueDate && cc.balance > 0) {
+      if (cc.due_date && cc.balance > 0) {
         const now = new Date();
         let dueDate = new Date(
           now.getFullYear(),
           now.getMonth(),
-          cc.dueDate
+          cc.due_date
         );
         if (dueDate < now) {
-          dueDate = new Date(now.getFullYear(), now.getMonth() + 1, cc.dueDate);
+          dueDate = new Date(now.getFullYear(), now.getMonth() + 1, cc.due_date);
         }
         const dueDateStr = format(dueDate, "yyyy-MM-dd");
         if (dueDateStr >= today && dueDateStr <= in14Days) {
@@ -206,33 +201,33 @@ export async function GET() {
     allUpcoming.sort((a, b) => a.date.localeCompare(b.date));
 
     // Spending by category this month
-    const spendingByCategory = monthlySpending.map((s) => ({
+    const spendingByCategory = monthlySpending.map((s: any) => ({
       category: s.category || "Uncategorised",
       amount: Number(s.total),
     }));
 
     // Accounts summary
     const accountsSummary = {
-      bankAccounts: bankAccounts.map((a) => ({
+      bankAccounts: bankAccounts.map((a: any) => ({
         name: a.name,
         balance: a.balance,
       })),
-      creditCards: creditCards.map((cc) => ({
+      creditCards: creditCards.map((cc: any) => ({
         name: cc.name,
         balance: cc.balance,
-        limit: cc.creditLimit,
+        limit: cc.credit_limit,
       })),
     };
 
     const wishlistSummary = {
-      topItems: wishlistItemsData.slice(0, 3).map((i) => ({
+      topItems: wishlistItemsData.slice(0, 3).map((i: any) => ({
         id: i.id,
         name: i.name,
         price: i.price,
         priority: i.priority,
         status: i.status,
       })),
-      totalValue: wishlistItemsData.reduce((sum, i) => sum + i.price, 0),
+      totalValue: wishlistItemsData.reduce((sum: number, i: any) => sum + i.price, 0),
       itemCount: wishlistItemsData.length,
     };
 
@@ -246,7 +241,7 @@ export async function GET() {
       totalBnplDebt,
       upcomingPayments: allUpcoming,
       spendingByCategory,
-      recentTransactions,
+      recentTransactions: toCamel(recentTransactions),
       accountsSummary,
       wishlistSummary,
     });
