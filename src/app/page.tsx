@@ -718,7 +718,7 @@ function DashboardInner() {
                 onKeyDown={handleKeyDown}
                 placeholder="Ask about your finances..."
                 rows={1}
-                className="w-full overflow-hidden resize-none rounded-2xl border border-white/[0.08] bg-zinc-900/60 py-2.5 pl-4 pr-12 text-sm leading-6 text-zinc-200 placeholder:text-zinc-600 focus:border-[#c4f441]/30 focus:outline-none focus:ring-1 focus:ring-[#c4f441]/20"
+                className="w-full overflow-hidden resize-none rounded-2xl border border-white/[0.08] bg-zinc-900/60 py-2.5 pl-4 pr-12 text-base leading-6 text-zinc-200 placeholder:text-zinc-600 focus:border-[#c4f441]/30 focus:outline-none focus:ring-1 focus:ring-[#c4f441]/20"
                 disabled={isLoading}
               />
 
