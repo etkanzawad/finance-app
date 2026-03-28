@@ -464,14 +464,16 @@ function DashboardInner() {
 
   return (
     <div
-      style={{ height: "calc(100dvh - env(safe-area-inset-top, 0px) - 4.5rem)" }}
-      className={`flex flex-col -mx-4 -mb-4 lg:-m-8 lg:!h-screen ${isDragging ? "ring-2 ring-[#c4f441]/30 ring-inset" : ""}`}
+      className={`fixed inset-0 z-10 flex flex-col bg-zinc-950 lg:static lg:z-auto lg:-m-8 lg:h-screen ${isDragging ? "ring-2 ring-[#c4f441]/30 ring-inset" : ""}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto relative min-h-0">
+      <div
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 3.5rem)" }}
+        className="flex-1 overflow-y-auto relative min-h-0 lg:!pt-0"
+      >
         {isWelcome ? (
           /* ── Welcome Screen ── */
           <div className="flex h-full flex-col items-center justify-center px-4 py-6 overflow-y-auto min-h-0">
