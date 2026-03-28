@@ -464,7 +464,7 @@ function DashboardInner() {
 
   return (
     <div
-      className={`fixed inset-0 z-10 flex flex-col bg-zinc-950 lg:static lg:z-auto lg:-m-8 lg:h-screen ${isDragging ? "ring-2 ring-[#c4f441]/30 ring-inset" : ""}`}
+      className={`fixed inset-x-0 top-0 z-10 flex h-[100dvh] flex-col bg-zinc-950 lg:static lg:z-auto lg:-m-8 lg:h-screen ${isDragging ? "ring-2 ring-[#c4f441]/30 ring-inset" : ""}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
