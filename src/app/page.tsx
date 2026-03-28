@@ -18,6 +18,7 @@ import {
   Paperclip,
   X,
   FileText,
+  Clock,
 } from "lucide-react";
 import Link from "next/link";
 import { ChatUIRenderer } from "@/components/chat/ChatUIRenderer";
@@ -692,6 +693,15 @@ function DashboardInner() {
             >
               <SquarePen className="h-4 w-4" />
             </button>
+
+            {/* Chat history button */}
+            <Link
+              href="/history"
+              className="shrink-0 rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-zinc-600 transition-colors hover:bg-white/[0.06] hover:text-zinc-400"
+              title="Chat history"
+            >
+              <Clock className="h-4 w-4" />
+            </Link>
 
             {/* Attach file button */}
             <button

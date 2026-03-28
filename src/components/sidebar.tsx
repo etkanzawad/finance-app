@@ -6,13 +6,10 @@ import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
-  CreditCard,
   Settings,
   DollarSign,
-  Heart,
-  User,
+  Target,
   LogOut,
-  MessageSquare,
   Receipt,
   X,
 } from "lucide-react";
@@ -21,13 +18,9 @@ import { createClient } from "@/lib/supabase/client";
 export const mainNavItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/expenses", label: "Expenses", icon: Receipt },
-  { href: "/wishlist", label: "Wishlist", icon: Heart },
-  { href: "/bnpl", label: "BNPL Tracker", icon: CreditCard },
-  { href: "/history", label: "Chat History", icon: MessageSquare },
+  { href: "/wishlist", label: "Plans", icon: Target },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
-
-const profileItem = { href: "/profile", label: "Profile", icon: User };
 
 export function NavLink({
   item,
@@ -99,9 +92,8 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Profile & Sign Out at bottom */}
+      {/* Sign Out at bottom */}
       <div className="border-t border-white/[0.06] px-3 py-3 space-y-1">
-        <NavLink item={profileItem} pathname={pathname} />
         <button
           onClick={handleSignOut}
           className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-400"
@@ -196,9 +188,8 @@ export function MobileSideDrawer({
           ))}
         </nav>
 
-        {/* Profile & Sign Out */}
+        {/* Sign Out */}
         <div className="border-t border-white/[0.06] px-3 py-3 space-y-1">
-          <NavLink item={profileItem} pathname={pathname} onClick={onClose} />
           <button
             onClick={handleSignOut}
             className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-400 transition-all duration-150 hover:bg-red-500/10 hover:text-red-400"

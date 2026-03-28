@@ -21,9 +21,16 @@ import {
   Key,
   Cpu,
   Loader2,
-  FileText,
+  User,
+  DollarSign,
+  Landmark,
+  ShoppingBag,
 } from "lucide-react";
-import { BnplAgreementUpload } from "@/components/bnpl/BnplAgreementUpload";
+
+import { ProfileSection } from "@/components/settings/ProfileSection";
+import { IncomeSection } from "@/components/settings/IncomeSection";
+import { AccountsSection } from "@/components/settings/AccountsSection";
+import { BnplAccountsSection } from "@/components/settings/BnplAccountsSection";
 
 // ---- AI Settings ----
 
@@ -297,33 +304,9 @@ function DataManagementSection() {
   );
 }
 
-// ---- BNPL Agreements ----
-
-function BnplSettingsSection() {
-  return (
-    <div className="space-y-5">
-      <div className="rounded-xl border border-white/[0.06] bg-zinc-900/60 p-5 backdrop-blur-sm">
-        <div className="flex items-center gap-2.5 text-sm font-medium text-zinc-400">
-          <div className="rounded-lg bg-amber-500/10 p-1.5">
-            <FileText className="h-3.5 w-3.5 text-amber-400" />
-          </div>
-          Upload BNPL Agreement
-        </div>
-        <p className="mt-1.5 text-xs text-zinc-600">
-          Upload Buy Now Pay Later agreement documents for record-keeping.
-          Files are stored securely in your Supabase storage.
-        </p>
-        <div className="mt-4">
-          <BnplAgreementUpload />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ---- Settings Tabs ----
 
-type SettingsTab = "ai" | "data" | "bnpl";
+type SettingsTab = "profile" | "income" | "accounts" | "bnpl" | "ai" | "data";
 
 const TABS: {
   id: SettingsTab;
@@ -331,51 +314,59 @@ const TABS: {
   icon: React.ElementType;
   accent: string;
 }[] = [
+  { id: "profile", label: "Profile", icon: User, accent: "text-sky-400" },
+  { id: "income", label: "Income", icon: DollarSign, accent: "text-emerald-400" },
+  { id: "accounts", label: "Accounts", icon: Landmark, accent: "text-violet-400" },
+  { id: "bnpl", label: "BNPL", icon: ShoppingBag, accent: "text-orange-400" },
   { id: "ai", label: "AI", icon: Brain, accent: "text-violet-400" },
   { id: "data", label: "Data", icon: Database, accent: "text-emerald-400" },
-  { id: "bnpl", label: "BNPL", icon: FileText, accent: "text-amber-400" },
 ];
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("ai");
+  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
 
   return (
     <div className="space-y-8 pb-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          AI configuration and data management
+          Manage your profile, accounts, and app configuration
         </p>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-zinc-900/60 p-1 backdrop-blur-sm max-w-sm">
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-medium transition-all ${
-                isActive
-                  ? "bg-white/[0.08] text-zinc-100 shadow-sm"
-                  : "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-400"
-              }`}
-            >
-              <tab.icon
-                className={`h-3.5 w-3.5 ${isActive ? tab.accent : ""}`}
-              />
-              {tab.label}
-            </button>
-          );
-        })}
+      {/* Tab Navigation — scrollable on mobile */}
+      <div className="overflow-x-auto -mx-1 px-1">
+        <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-zinc-900/60 p-1 backdrop-blur-sm min-w-max">
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-all ${
+                  isActive
+                    ? "bg-white/[0.08] text-zinc-100 shadow-sm"
+                    : "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-400"
+                }`}
+              >
+                <tab.icon
+                  className={`h-3.5 w-3.5 ${isActive ? tab.accent : ""}`}
+                />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Content */}
       <div>
+        {activeTab === "profile" && <ProfileSection />}
+        {activeTab === "income" && <IncomeSection />}
+        {activeTab === "accounts" && <AccountsSection />}
+        {activeTab === "bnpl" && <BnplAccountsSection />}
         {activeTab === "ai" && <AiSettingsSection />}
         {activeTab === "data" && <DataManagementSection />}
-        {activeTab === "bnpl" && <BnplSettingsSection />}
       </div>
     </div>
   );

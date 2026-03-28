@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   Card,
@@ -71,6 +72,29 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+
+const GoalsPage = dynamic(() => import("@/app/goals/page"), {
+  loading: () => (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 className="h-6 w-6 animate-spin text-zinc-600" />
+    </div>
+  ),
+});
+const BnplPage = dynamic(() => import("@/app/bnpl/page"), {
+  loading: () => (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 className="h-6 w-6 animate-spin text-zinc-600" />
+    </div>
+  ),
+});
+
+type PlansTab = "wishlist" | "goals" | "bnpl";
+
+const PLANS_TABS: { id: PlansTab; label: string; icon: React.ElementType; accent: string }[] = [
+  { id: "wishlist", label: "Wishlist", icon: Heart, accent: "text-pink-400" },
+  { id: "goals", label: "Goals", icon: Target, accent: "text-emerald-400" },
+  { id: "bnpl", label: "BNPL", icon: CreditCard, accent: "text-orange-400" },
+];
 
 interface WishlistItem {
   id: number;
@@ -218,7 +242,7 @@ const CATEGORIES = [
   "Other",
 ];
 
-export default function WishlistPage() {
+function WishlistContent() {
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1127,6 +1151,50 @@ export default function WishlistPage() {
       )}
 
 
+    </div>
+  );
+}
+
+export default function PlansPage() {
+  const [activeTab, setActiveTab] = useState<PlansTab>("wishlist");
+
+  return (
+    <div className="space-y-6 pb-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Plans</h1>
+        <p className="mt-1 text-sm text-zinc-500">
+          Your wishlist, savings goals, and BNPL tracking
+        </p>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-zinc-900/60 p-1 backdrop-blur-sm max-w-sm">
+        {PLANS_TABS.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-xs font-medium transition-all ${
+                isActive
+                  ? "bg-white/[0.08] text-zinc-100 shadow-sm"
+                  : "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-400"
+              }`}
+            >
+              <tab.icon
+                className={`h-3.5 w-3.5 ${isActive ? tab.accent : ""}`}
+              />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === "wishlist" && <WishlistContent />}
+      {activeTab === "goals" && <GoalsPage />}
+      {activeTab === "bnpl" && <BnplPage />}
     </div>
   );
 }
