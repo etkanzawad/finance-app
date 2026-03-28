@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  Brain,
   Database,
   Download,
   Upload,
@@ -306,7 +305,7 @@ function DataManagementSection() {
 
 // ---- Settings Tabs ----
 
-type SettingsTab = "profile" | "income" | "accounts" | "bnpl" | "ai" | "data";
+type SettingsTab = "profile" | "income" | "accounts" | "bnpl" | "data";
 
 const TABS: {
   id: SettingsTab;
@@ -318,7 +317,6 @@ const TABS: {
   { id: "income", label: "Income", icon: DollarSign, accent: "text-emerald-400" },
   { id: "accounts", label: "Accounts", icon: Landmark, accent: "text-violet-400" },
   { id: "bnpl", label: "BNPL", icon: ShoppingBag, accent: "text-orange-400" },
-  { id: "ai", label: "AI", icon: Brain, accent: "text-violet-400" },
   { id: "data", label: "Data", icon: Database, accent: "text-emerald-400" },
 ];
 
@@ -365,7 +363,6 @@ export default function SettingsPage() {
         {activeTab === "income" && <IncomeSection />}
         {activeTab === "accounts" && <AccountsSection />}
         {activeTab === "bnpl" && <BnplAccountsSection />}
-        {activeTab === "ai" && <AiSettingsSection />}
         {activeTab === "data" && <DataManagementSection />}
       </div>
     </div>

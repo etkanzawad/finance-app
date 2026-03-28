@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { formatMoney, formatDate, dollarsToCents, centsToDollars } from "@/lib/format";
-import { Plus, Pencil, Trash2, Target, TrendingUp, AlertTriangle, Calculator } from "lucide-react";
+import { Plus, Pencil, Trash2, Target, TrendingUp, AlertTriangle, Calculator, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface SavingsGoal {
@@ -40,10 +40,15 @@ const PRIORITY_COLORS: Record<number, string> = {
   5: "text-muted-foreground",
 };
 
-export default function GoalsPage() {
+export default function GoalsPage({ addOpen, onAddOpenChange }: { addOpen?: boolean; onAddOpenChange?: (open: boolean) => void } = {}) {
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogOpenInternal, setDialogOpenInternal] = useState(false);
+  const dialogOpen = addOpen ?? dialogOpenInternal;
+  const setDialogOpen = (open: boolean) => {
+    setDialogOpenInternal(open);
+    onAddOpenChange?.(open);
+  };
   const [editingGoal, setEditingGoal] = useState<SavingsGoal | null>(null);
   const [bnplExposure, setBnplExposure] = useState(0);
   const [selectedGoal, setSelectedGoal] = useState<SavingsGoal | null>(null);
@@ -196,95 +201,78 @@ export default function GoalsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Savings Goals</h1>
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-zinc-600" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Savings Goals</h1>
-          <p className="text-muted-foreground">
-            Track progress towards your financial goals
-          </p>
-        </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> Add Goal
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingGoal ? "Edit Goal" : "New Savings Goal"}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingGoal ? "Edit Goal" : "New Savings Goal"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Goal Name</Label>
+              <Input
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                placeholder="e.g. Emergency Fund"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Goal Name</Label>
+                <Label>Target Amount ($)</Label>
                 <Input
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  placeholder="e.g. Emergency Fund"
+                  type="number"
+                  step="0.01"
+                  value={formTarget}
+                  onChange={(e) => setFormTarget(e.target.value)}
                   required
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Target Amount ($)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formTarget}
-                    onChange={(e) => setFormTarget(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Current Amount ($)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formCurrent}
-                    onChange={(e) => setFormCurrent(e.target.value)}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label>Current Amount ($)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={formCurrent}
+                  onChange={(e) => setFormCurrent(e.target.value)}
+                />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Deadline (optional)</Label>
-                  <Input
-                    type="date"
-                    value={formDeadline}
-                    onChange={(e) => setFormDeadline(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Priority</Label>
-                  <Select value={formPriority} onValueChange={setFormPriority}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">Critical</SelectItem>
-                      <SelectItem value="2">High</SelectItem>
-                      <SelectItem value="3">Medium</SelectItem>
-                      <SelectItem value="4">Low</SelectItem>
-                      <SelectItem value="5">Someday</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Deadline (optional)</Label>
+                <Input
+                  type="date"
+                  value={formDeadline}
+                  onChange={(e) => setFormDeadline(e.target.value)}
+                />
               </div>
-              <Button type="submit" className="w-full">
-                {editingGoal ? "Update Goal" : "Create Goal"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Select value={formPriority} onValueChange={setFormPriority}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">P1 — Must have</SelectItem>
+                    <SelectItem value="2">P2 — Nice to have</SelectItem>
+                    <SelectItem value="3">P3 — Someday</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button type="submit" className="w-full">
+              {editingGoal ? "Update Goal" : "Create Goal"}
+            </Button>
+          </form>
+        </DialogContent>
 
       {/* Overview Cards */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
@@ -330,6 +318,7 @@ export default function GoalsPage() {
           </Card>
         )}
       </div>
+      </Dialog>
 
       {/* Contribution Calculator */}
       <Card>

@@ -221,16 +221,6 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-8 pb-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Expenses & Subscriptions
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Track your recurring bills and subscription services
-        </p>
-      </div>
-
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <SummaryCard

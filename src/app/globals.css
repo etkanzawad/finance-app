@@ -116,6 +116,13 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Safe area top padding for mobile — clears hamburger + Dynamic Island */
+@media (max-width: 1023px) {
+  .safe-top {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 4.5rem) !important;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

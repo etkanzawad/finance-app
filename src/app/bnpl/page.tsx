@@ -112,11 +112,16 @@ const FREQ_BADGE_STYLES: Record<string, string> = {
   monthly: "bg-zinc-500/15 text-zinc-500 border-0",
 };
 
-export default function BnplPage() {
+export default function BnplPage({ addOpen, onAddOpenChange }: { addOpen?: boolean; onAddOpenChange?: (open: boolean) => void } = {}) {
   const [plans, setPlans] = useState<BnplPlan[]>([]);
   const [accounts, setAccounts] = useState<BnplAccount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogOpenInternal, setDialogOpenInternal] = useState(false);
+  const dialogOpen = addOpen ?? dialogOpenInternal;
+  const setDialogOpen = (open: boolean) => {
+    setDialogOpenInternal(open);
+    onAddOpenChange?.(open);
+  };
   const [editingPlan, setEditingPlan] = useState<BnplPlan | null>(null);
   const [providerFilter, setProviderFilter] = useState<string>("all");
   const [selectedPlan, setSelectedPlan] = useState<BnplPlan | null>(null);
@@ -436,27 +441,14 @@ export default function BnplPage() {
 
   return (
     <div className="space-y-8 pb-8">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">BNPL Tracker</h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            Track all your buy-now-pay-later commitments
-          </p>
-        </div>
-        <Dialog
-          open={dialogOpen}
-          onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) resetForm();
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button className="bg-[#c4f441] font-semibold text-zinc-900 hover:bg-[#d4ff51] active:bg-[#b4e431]">
-              <Plus className="mr-2 h-4 w-4" /> Add Plan
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="border-white/[0.08] bg-zinc-900">
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) resetForm();
+        }}
+      >
+        <DialogContent className="border-white/[0.08] bg-zinc-900">
             <DialogHeader>
               <DialogTitle>
                 {editingPlan ? "Edit Plan" : "Add BNPL Plan"}
@@ -611,55 +603,47 @@ export default function BnplPage() {
               </Button>
             </form>
           </DialogContent>
-        </Dialog>
-      </div>
 
-      {/* Hero Stats */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 p-8">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-500/[0.07] via-transparent to-red-500/[0.04]" />
-        <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-amber-500/[0.03] blur-3xl" />
-        <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-red-500/[0.04] blur-3xl" />
-        <div className="relative grid gap-6 grid-cols-1 sm:grid-cols-3">
-          <div className="text-center sm:text-left">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3.5 py-1.5 text-xs font-medium text-zinc-400 backdrop-blur-sm">
-              <ShieldAlert className="h-3.5 w-3.5 text-amber-400" />
-              Total Exposure
-            </div>
-            <p className="mt-4 text-5xl font-bold tracking-tighter text-amber-400">
-              {formatMoney(totalExposure)}
-            </p>
-            <p className="mt-2 text-sm text-zinc-500">
-              across {plans.length} active{" "}
-              {plans.length === 1 ? "plan" : "plans"}
-            </p>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-2xl border border-white/[0.06] bg-zinc-900/60 px-3 py-3">
+          <div className="flex items-center gap-1.5">
+            <ShieldAlert className="h-3.5 w-3.5 text-amber-400" />
+            <span className="text-[11px] font-medium text-zinc-500">Exposure</span>
           </div>
+          <p className="mt-1.5 text-lg font-bold tracking-tight text-amber-400">
+            {formatMoney(totalExposure)}
+          </p>
+          <p className="text-[11px] text-zinc-600">
+            {plans.length} {plans.length === 1 ? "plan" : "plans"}
+          </p>
+        </div>
 
-          <div className="text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3.5 py-1.5 text-xs font-medium text-zinc-400 backdrop-blur-sm">
-              <TrendingDown className="h-3.5 w-3.5 text-red-400" />
-              Monthly Commitment
-            </div>
-            <p className="mt-4 text-5xl font-bold tracking-tighter text-zinc-100">
-              {formatMoney(Math.round(totalMonthlyCommitment))}
-            </p>
-            <p className="mt-2 text-sm text-zinc-500">estimated per month</p>
+        <div className="rounded-2xl border border-white/[0.06] bg-zinc-900/60 px-3 py-3">
+          <div className="flex items-center gap-1.5">
+            <TrendingDown className="h-3.5 w-3.5 text-red-400" />
+            <span className="text-[11px] font-medium text-zinc-500">Monthly</span>
           </div>
+          <p className="mt-1.5 text-lg font-bold tracking-tight text-zinc-100">
+            {formatMoney(Math.round(totalMonthlyCommitment))}
+          </p>
+          <p className="text-[11px] text-zinc-600">per month</p>
+        </div>
 
-          <div className="text-center sm:text-right">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3.5 py-1.5 text-xs font-medium text-zinc-400 backdrop-blur-sm">
-              <Receipt className="h-3.5 w-3.5 text-[#c4f441]" />
-              Active Plans
-            </div>
-            <p className="mt-4 text-5xl font-bold tracking-tighter text-zinc-100">
-              {plans.length}
-            </p>
-            <p className="mt-2 text-sm text-zinc-500">
-              {uniqueProviders.length}{" "}
-              {uniqueProviders.length === 1 ? "provider" : "providers"}
-            </p>
+        <div className="rounded-2xl border border-white/[0.06] bg-zinc-900/60 px-3 py-3">
+          <div className="flex items-center gap-1.5">
+            <Receipt className="h-3.5 w-3.5 text-[#c4f441]" />
+            <span className="text-[11px] font-medium text-zinc-500">Active</span>
           </div>
+          <p className="mt-1.5 text-lg font-bold tracking-tight text-zinc-100">
+            {plans.length}
+          </p>
+          <p className="text-[11px] text-zinc-600">
+            {uniqueProviders.length} {uniqueProviders.length === 1 ? "provider" : "providers"}
+          </p>
         </div>
       </div>
+      </Dialog>
 
       {/* Provider Summary Cards */}
       {Object.keys(providerSummary).length > 0 && (

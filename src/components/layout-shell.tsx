@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar, MobileSideDrawer } from "@/components/sidebar";
 import { MobileHamburger } from "@/components/mobile-nav";
@@ -25,13 +25,17 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
       <MobileHamburger onOpen={() => setMobileNavOpen(true)} />
 
       {/* Mobile slide-in drawer */}
-      <MobileSideDrawer
-        isOpen={mobileNavOpen}
-        onClose={() => setMobileNavOpen(false)}
-      />
+      <Suspense>
+        <MobileSideDrawer
+          isOpen={mobileNavOpen}
+          onClose={() => setMobileNavOpen(false)}
+        />
+      </Suspense>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto p-4 lg:p-8">{children}</main>
+      <main className="flex-1 overflow-y-auto px-4 pb-4 pt-14 safe-top lg:p-8">
+        {children}
+      </main>
     </div>
   );
 }

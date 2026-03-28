@@ -175,19 +175,15 @@ interface BnplAdvisorResult {
 }
 
 const PRIORITY_LABELS: Record<number, string> = {
-  1: "Critical",
-  2: "High",
-  3: "Medium",
-  4: "Low",
-  5: "Someday",
+  1: "P1",
+  2: "P2",
+  3: "P3",
 };
 
 const PRIORITY_BADGE_STYLES: Record<number, string> = {
   1: "bg-red-500/15 text-red-400 border-0",
   2: "bg-orange-500/15 text-orange-400 border-0",
   3: "bg-amber-500/15 text-amber-400 border-0",
-  4: "bg-sky-500/15 text-sky-400 border-0",
-  5: "bg-zinc-500/15 text-zinc-500 border-0",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -234,11 +230,16 @@ const CATEGORIES = [
   "Other",
 ];
 
-function WishlistContent() {
+function WishlistContent({ addOpen, onAddOpenChange }: { addOpen?: boolean; onAddOpenChange?: (open: boolean) => void }) {
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogOpenInternal, setDialogOpenInternal] = useState(false);
+  const dialogOpen = addOpen ?? dialogOpenInternal;
+  const setDialogOpen = (open: boolean) => {
+    setDialogOpenInternal(open);
+    onAddOpenChange?.(open);
+  };
   const [editingItem, setEditingItem] = useState<WishlistItem | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [savingsBalance, setSavingsBalance] = useState<{ name: string; balance: number } | null>(null);
@@ -254,7 +255,7 @@ function WishlistContent() {
   const [formPrice, setFormPrice] = useState("");
   const [formUrl, setFormUrl] = useState("");
   const [formStore, setFormStore] = useState("");
-  const [formPriority, setFormPriority] = useState("3");
+  const [formPriority, setFormPriority] = useState("2");
   const [formNotes, setFormNotes] = useState("");
   const [formCategory, setFormCategory] = useState("");
 
@@ -265,9 +266,25 @@ function WishlistContent() {
         fetch("/api/savings-goals"),
         fetch("/api/dashboard"),
       ]);
-      const itemsData = await itemsRes.json();
+      const itemsData: WishlistItem[] = await itemsRes.json();
       const goalsData = await goalsRes.json();
-      setItems(itemsData);
+
+      // Auto-delete purchased items older than 2 days
+      const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
+      const expiredPurchased = itemsData.filter(
+        (i) =>
+          i.status === "purchased" &&
+          i.datePurchased &&
+          new Date(i.datePurchased).getTime() < twoDaysAgo
+      );
+      for (const item of expiredPurchased) {
+        fetch(`/api/wishlist/${item.id}`, { method: "DELETE" }).catch(() => {});
+      }
+      const remainingItems = expiredPurchased.length > 0
+        ? itemsData.filter((i) => !expiredPurchased.some((e) => e.id === i.id))
+        : itemsData;
+
+      setItems(remainingItems);
       setGoals(goalsData);
       if (dashRes.ok) {
         const dashData = await dashRes.json();
@@ -294,7 +311,7 @@ function WishlistContent() {
     setFormPrice("");
     setFormUrl("");
     setFormStore("");
-    setFormPriority("3");
+    setFormPriority("2");
     setFormNotes("");
     setFormCategory("");
     setEditingItem(null);
@@ -427,7 +444,13 @@ function WishlistContent() {
   const filteredItems =
     statusFilter === "all"
       ? items
-      : items.filter((i) => i.status === statusFilter);
+      : statusFilter === "p1"
+        ? items.filter((i) => i.priority === 1 && i.status !== "purchased")
+        : statusFilter === "p2"
+          ? items.filter((i) => i.priority === 2 && i.status !== "purchased")
+          : statusFilter === "p3"
+            ? items.filter((i) => i.priority === 3 && i.status !== "purchased")
+            : items.filter((i) => i.status === statusFilter);
 
   // Summary stats
   const activeItems = items.filter(
@@ -446,29 +469,19 @@ function WishlistContent() {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Add button — top right, clears the hamburger on mobile */}
-      <div className="flex justify-end pl-12 lg:pl-0">
-        <Dialog
-          open={dialogOpen}
-          onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) resetForm();
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button
-              size="icon"
-              className="h-9 w-9 rounded-full bg-[#c4f441] text-zinc-900 hover:bg-[#d4ff51] active:bg-[#b4e431]"
-            >
-              <Plus className="h-5 w-5" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="border-white/[0.08] bg-zinc-900">
-            <DialogHeader>
-              <DialogTitle>
-                {editingItem ? "Edit Item" : "Add to Wishlist"}
-              </DialogTitle>
-            </DialogHeader>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) resetForm();
+        }}
+      >
+        <DialogContent className="border-white/[0.08] bg-zinc-900">
+          <DialogHeader>
+            <DialogTitle>
+              {editingItem ? "Edit Item" : "Add to Wishlist"}
+            </DialogTitle>
+          </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label className="text-zinc-400">Item Name</Label>
@@ -520,11 +533,9 @@ function WishlistContent() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">Critical</SelectItem>
-                      <SelectItem value="2">High</SelectItem>
-                      <SelectItem value="3">Medium</SelectItem>
-                      <SelectItem value="4">Low</SelectItem>
-                      <SelectItem value="5">Someday</SelectItem>
+                      <SelectItem value="1">P1 — Must have</SelectItem>
+                      <SelectItem value="2">P2 — Nice to have</SelectItem>
+                      <SelectItem value="3">P3 — Someday</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -558,371 +569,47 @@ function WishlistContent() {
               </Button>
             </form>
           </DialogContent>
-        </Dialog>
-      </div>
 
       {/* Hero Stats */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 p-5 sm:p-8">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-pink-500/[0.07] via-transparent to-violet-500/[0.04]" />
-        <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-pink-500/[0.03] blur-3xl" />
-        <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-violet-500/[0.04] blur-3xl" />
-
-        {/* Wishlist Value */}
-        <div className="relative">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-zinc-400 backdrop-blur-sm">
-            <Heart className="h-3.5 w-3.5 text-pink-400" />
-            Wishlist Value
+      <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 px-4 py-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-pink-500/10 p-2.5">
+              <Heart className="h-5 w-5 text-pink-400" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-zinc-500">Wishlist Value</p>
+              <p className="text-2xl font-bold tracking-tight text-zinc-100">
+                {formatMoney(totalValue)}
+              </p>
+            </div>
           </div>
-          <p className="mt-3 text-4xl font-bold tracking-tighter text-zinc-100 sm:text-5xl">
-            {formatMoney(totalValue)}
-          </p>
-          <p className="mt-1.5 text-sm text-zinc-500">
-            {activeItems.length} active {activeItems.length === 1 ? "item" : "items"}
+          <p className="text-sm text-zinc-500">
+            {activeItems.length} {activeItems.length === 1 ? "item" : "items"}
           </p>
         </div>
       </div>
+      </Dialog>
 
-      {/* AI BNPL Advisor */}
-      <Card className="border-white/[0.06] bg-zinc-900/60 backdrop-blur-sm">
-        <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-gradient-to-br from-[#c4f441]/20 to-[#c4f441]/5 p-2.5 shrink-0">
-                <Bot className="h-5 w-5 text-[#c4f441]" />
-              </div>
-              <div>
-                <CardTitle className="text-base font-semibold">AI BNPL Advisor</CardTitle>
-                <CardDescription className="text-zinc-600">
-                  Smart recommendations on what to buy and which BNPL provider to use
-                </CardDescription>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {bnplAdvisor && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-10 w-10 shrink-0 text-zinc-600 hover:text-zinc-300"
-                  onClick={() => setBnplAdvisor(null)}
-                >
-                  <XCircle className="h-5 w-5" />
-                </Button>
-              )}
-              <Button
-                onClick={handleBnplAdvisor}
-                disabled={bnplAdvisorLoading || activeItems.length === 0}
-                className="flex-1 sm:flex-none bg-[#c4f441] font-semibold text-zinc-900 hover:bg-[#d4ff51] active:bg-[#b4e431]"
-              >
-                {bnplAdvisorLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="mr-2 h-4 w-4" />
-                )}
-                {bnplAdvisor ? "Re-analyse" : "Analyse My Wishlist"}
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        {bnplAdvisor && (
-          <CardContent className="space-y-5">
-            {/* BNPL Health Check */}
-            <div className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#c4f441]" />
-              <div>
-                <p className="text-sm font-medium text-zinc-200">BNPL Health Check</p>
-                <p className="mt-1 text-sm text-zinc-500">{bnplAdvisor.bnplHealthCheck}</p>
-              </div>
-            </div>
-
-            {/* Overall Summary */}
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-              <p className="text-sm leading-relaxed text-zinc-400">{bnplAdvisor.overallSummary}</p>
-            </div>
-
-            {/* Item Recommendations */}
-            <div className="space-y-3">
-              {bnplAdvisor.items.map((item) => {
-                const style = RECOMMENDATION_STYLES[item.recommendation] || RECOMMENDATION_STYLES.wait;
-                return (
-                  <div
-                    key={item.itemId}
-                    className={`group relative overflow-hidden rounded-xl border ${style.border} bg-gradient-to-br ${style.bg} p-4 sm:p-5 transition-all hover:shadow-lg`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`mt-0.5 rounded-lg bg-white/[0.06] p-2 shrink-0 ${style.icon}`}>
-                        {RECOMMENDATION_ICONS[item.recommendation] || <DollarSign className="h-4 w-4" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <p className="font-semibold text-zinc-100">{item.itemName}</p>
-                          <p className="text-sm font-medium text-zinc-400 tabular-nums">{formatMoney(Math.round(item.price * 100))}</p>
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <Badge variant="secondary" className={`text-xs font-semibold ${item.canAfford ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"} border-0`}>
-                            {item.canAfford ? "Can afford" : "Can't afford right now"}
-                          </Badge>
-                          <Badge variant="secondary" className={`text-xs font-semibold border-0 ${style.icon.replace("text-", "bg-").replace("400", "500/15")} ${style.icon}`}>
-                            {style.label}
-                          </Badge>
-                        </div>
-                        <p className="mt-2.5 text-sm leading-relaxed text-zinc-400">
-                          {item.reasoning}
-                        </p>
-                        {item.paymentBreakdown && (
-                          <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-white/[0.04] px-2.5 py-1 text-xs text-zinc-500">
-                            <CreditCard className="h-3 w-3" />
-                            {item.paymentBreakdown}
-                          </div>
-                        )}
-                        {item.warnings.length > 0 && (
-                          <div className="mt-3 space-y-1">
-                            {item.warnings.map((w, i) => (
-                              <div key={i} className="flex items-start gap-1.5 text-xs text-amber-400/80">
-                                <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                                <span>{w}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="absolute -bottom-4 -right-4 h-24 w-24 rounded-full bg-white/[0.02] blur-2xl transition-all group-hover:bg-white/[0.04]" />
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        )}
-        {!bnplAdvisor && !bnplAdvisorLoading && activeItems.length > 0 && (
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-6 text-center">
-              <div className="rounded-full bg-[#c4f441]/[0.06] p-3">
-                <Bot className="h-5 w-5 text-[#c4f441]/50" />
-              </div>
-              <p className="mt-3 text-sm text-zinc-600">
-                Click &quot;Analyse My Wishlist&quot; to get personalised BNPL recommendations
-              </p>
-              <div className="mt-3 flex gap-4 text-xs text-zinc-600">
-                <span className="flex items-center gap-1"><CreditCard className="h-3 w-3" /> Afterpay</span>
-                <span className="flex items-center gap-1"><Zap className="h-3 w-3" /> Zip Pay</span>
-                <span className="flex items-center gap-1"><Banknote className="h-3 w-3" /> Cash</span>
-              </div>
-            </div>
-          </CardContent>
-        )}
-      </Card>
-
-      {/* Price Check */}
-      <Card className="border-white/[0.06] bg-zinc-900/60 backdrop-blur-sm">
-        <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-gradient-to-br from-orange-500/20 to-orange-500/5 p-2.5 shrink-0">
-                <TrendingDown className="h-5 w-5 text-orange-400" />
-              </div>
-              <div>
-                <CardTitle className="text-base font-semibold">Price Tracker</CardTitle>
-                <CardDescription className="text-zinc-600">
-                  Scrape your wishlisted URLs for price drops &amp; sales
-                </CardDescription>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {priceCheck && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-10 w-10 shrink-0 text-zinc-600 hover:text-zinc-300"
-                  onClick={() => setPriceCheck(null)}
-                >
-                  <XCircle className="h-5 w-5" />
-                </Button>
-              )}
-              <Button
-                onClick={handlePriceCheck}
-                disabled={priceCheckLoading || activeItems.filter((i) => i.url).length === 0}
-                className="flex-1 sm:flex-none bg-orange-500 font-semibold text-white hover:bg-orange-400 active:bg-orange-600"
-              >
-                {priceCheckLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                )}
-                {priceCheck ? "Re-check" : "Check Prices"}
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        {priceCheck && (
-          <CardContent className="space-y-5">
-            {/* Summary Stats */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-center">
-                <p className="text-2xl font-bold tabular-nums text-zinc-100">{priceCheck.summary.totalChecked}</p>
-                <p className="text-xs text-zinc-600">Checked</p>
-              </div>
-              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-3 text-center">
-                <p className="text-2xl font-bold tabular-nums text-emerald-400">{priceCheck.summary.priceDrops}</p>
-                <p className="text-xs text-emerald-400/60">Price Drops</p>
-              </div>
-              <div className="rounded-xl border border-orange-500/20 bg-orange-500/[0.04] p-3 text-center">
-                <p className="text-2xl font-bold tabular-nums text-orange-400">{priceCheck.summary.onSale}</p>
-                <p className="text-xs text-orange-400/60">On Sale</p>
-              </div>
-              {priceCheck.summary.totalSavings > 0 && (
-                <div className="rounded-xl border border-[#c4f441]/20 bg-[#c4f441]/[0.04] p-3 text-center">
-                  <p className="text-xl font-bold tabular-nums text-[#c4f441] sm:text-2xl">{formatMoney(priceCheck.summary.totalSavings)}</p>
-                  <p className="text-xs text-[#c4f441]/60">Potential Savings</p>
-                </div>
-              )}
-            </div>
-
-            {/* Individual Results */}
-            <div className="space-y-3">
-              {priceCheck.results
-                .sort((a, b) => a.priceDifference - b.priceDifference)
-                .map((result) => {
-                  const hasDrop = result.currentPrice !== null && result.priceDifference < 0;
-                  const hasIncrease = result.currentPrice !== null && result.priceDifference > 0;
-                  const isUnchanged = result.currentPrice !== null && result.priceDifference === 0;
-
-                  return (
-                    <div
-                      key={result.itemId}
-                      className={`group relative overflow-hidden rounded-xl border p-4 transition-all ${
-                        result.error
-                          ? "border-zinc-800 bg-zinc-900/40"
-                          : hasDrop
-                            ? "border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5"
-                            : result.onSale
-                              ? "border-orange-500/20 bg-gradient-to-br from-orange-500/10 to-orange-600/5"
-                              : hasIncrease
-                                ? "border-red-500/20 bg-gradient-to-br from-red-500/10 to-red-600/5"
-                                : "border-white/[0.06] bg-white/[0.02]"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-semibold text-zinc-100 truncate">{result.itemName}</p>
-                            {result.onSale && result.saleLabel && (
-                              <Badge variant="secondary" className="border-0 bg-orange-500/15 text-xs font-semibold text-orange-400 shrink-0">
-                                <Tag className="mr-1 h-3 w-3" />
-                                {result.saleLabel}
-                              </Badge>
-                            )}
-                          </div>
-                          {result.error ? (
-                            <p className="mt-1 text-sm text-zinc-600">{result.error}</p>
-                          ) : (
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <span className="text-sm text-zinc-500">
-                                Saved as {formatMoney(result.originalPrice)}
-                              </span>
-                              {result.currentPrice !== null && (
-                                <>
-                                  <span className="text-zinc-700">→</span>
-                                  <span className={`text-sm font-semibold ${
-                                    hasDrop ? "text-emerald-400" : hasIncrease ? "text-red-400" : "text-zinc-300"
-                                  }`}>
-                                    Now {formatMoney(result.currentPrice)}
-                                  </span>
-                                  {result.foreignCurrency && result.foreignPrice !== null && (
-                                    <span className="text-xs text-zinc-600">
-                                      ({CURRENCY_SYMBOLS[result.foreignCurrency] || result.foreignCurrency}{result.foreignPrice.toFixed(2)} {result.foreignCurrency} → AUD)
-                                    </span>
-                                  )}
-                                  {!isUnchanged && (
-                                    <Badge
-                                      variant="secondary"
-                                      className={`border-0 text-xs font-semibold ${
-                                        hasDrop
-                                          ? "bg-emerald-500/15 text-emerald-400"
-                                          : "bg-red-500/15 text-red-400"
-                                      }`}
-                                    >
-                                      {hasDrop ? (
-                                        <ArrowDown className="mr-0.5 h-3 w-3" />
-                                      ) : (
-                                        <ArrowUp className="mr-0.5 h-3 w-3" />
-                                      )}
-                                      {Math.abs(result.percentChange)}%
-                                    </Badge>
-                                  )}
-                                  {isUnchanged && (
-                                    <Badge variant="secondary" className="border-0 bg-zinc-800 text-xs font-semibold text-zinc-500">
-                                      <Minus className="mr-0.5 h-3 w-3" />
-                                      No change
-                                    </Badge>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <a href={result.url} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 border-white/[0.08] bg-white/[0.03] text-xs text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            View
-                          </Button>
-                        </a>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-
-            <p className="text-center text-xs text-zinc-700">
-              Last checked {new Date(priceCheck.checkedAt).toLocaleString()}
-            </p>
-          </CardContent>
-        )}
-        {!priceCheck && !priceCheckLoading && activeItems.filter((i) => i.url).length > 0 && (
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-6 text-center">
-              <div className="rounded-full bg-orange-500/[0.06] p-3">
-                <TrendingDown className="h-5 w-5 text-orange-500/50" />
-              </div>
-              <p className="mt-3 text-sm text-zinc-600">
-                Scrape product pages to detect price changes and sales
-              </p>
-              <p className="mt-1 text-xs text-zinc-700">
-                {activeItems.filter((i) => i.url).length} item{activeItems.filter((i) => i.url).length === 1 ? "" : "s"} with URLs to check
-              </p>
-            </div>
-          </CardContent>
-        )}
-        {!priceCheck && !priceCheckLoading && activeItems.filter((i) => i.url).length === 0 && (
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-6 text-center">
-              <div className="rounded-full bg-zinc-800 p-3">
-                <LinkIcon className="h-5 w-5 text-zinc-600" />
-              </div>
-              <p className="mt-3 text-sm text-zinc-600">
-                Add URLs to your wishlist items to enable price tracking
-              </p>
-            </div>
-          </CardContent>
-        )}
-      </Card>
-
-      {/* Status Filter Tabs */}
+      {/* Filter Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
-        {["all", "wanted", "saving", "purchased", "archived"].map((status) => (
+        {[
+          { key: "all", label: "All" },
+          { key: "p1", label: "P1" },
+          { key: "p2", label: "P2" },
+          { key: "p3", label: "P3" },
+          { key: "purchased", label: "Purchased" },
+        ].map((tab) => (
           <button
-            key={status}
-            onClick={() => setStatusFilter(status)}
+            key={tab.key}
+            onClick={() => setStatusFilter(tab.key)}
             className={`shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all ${
-              statusFilter === status
+              statusFilter === tab.key
                 ? "bg-[#c4f441] text-zinc-900"
                 : "border border-white/[0.06] bg-white/[0.02] text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
             }`}
           >
-            {status === "all" ? "All" : STATUS_LABELS[status]}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -1201,17 +888,18 @@ function WishlistContent() {
 
 export default function PlansPage() {
   const [activeTab, setActiveTab] = useState<PlansTab>("wishlist");
+  const [fabOpen, setFabOpen] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState<PlansTab | null>(null);
+
+  function handleFabChoice(tab: PlansTab) {
+    setFabOpen(false);
+    setActiveTab(tab);
+    // Small delay so the tab content mounts before opening dialog
+    setTimeout(() => setAddDialogOpen(tab), 50);
+  }
 
   return (
-    <div className="space-y-6 pb-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Plans</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Your wishlist, savings goals, and BNPL tracking
-        </p>
-      </div>
-
+    <div className="relative space-y-6 pb-8">
       {/* Tab Navigation */}
       <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-zinc-900/60 p-1 backdrop-blur-sm max-w-sm">
         {PLANS_TABS.map((tab) => {
@@ -1236,9 +924,62 @@ export default function PlansPage() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === "wishlist" && <WishlistContent />}
-      {activeTab === "goals" && <GoalsPage />}
-      {activeTab === "bnpl" && <BnplPage />}
+      {activeTab === "wishlist" && (
+        <WishlistContent
+          addOpen={addDialogOpen === "wishlist" ? true : undefined}
+          onAddOpenChange={(open) => { if (!open) setAddDialogOpen(null); }}
+        />
+      )}
+      {activeTab === "goals" && (
+        <GoalsPage
+          addOpen={addDialogOpen === "goals" ? true : undefined}
+          onAddOpenChange={(open) => { if (!open) setAddDialogOpen(null); }}
+        />
+      )}
+      {activeTab === "bnpl" && (
+        <BnplPage
+          addOpen={addDialogOpen === "bnpl" ? true : undefined}
+          onAddOpenChange={(open) => { if (!open) setAddDialogOpen(null); }}
+        />
+      )}
+
+      {/* FAB Backdrop */}
+      {fabOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+          onClick={() => setFabOpen(false)}
+        />
+      )}
+
+      {/* FAB Menu */}
+      {fabOpen && (
+        <div className="fixed bottom-24 right-6 z-50 flex flex-col items-end gap-2">
+          {[
+            { tab: "wishlist" as PlansTab, label: "Wishlist Item", icon: Heart },
+            { tab: "goals" as PlansTab, label: "Savings Goal", icon: Target },
+            { tab: "bnpl" as PlansTab, label: "BNPL Plan", icon: CreditCard },
+          ].map((opt) => (
+            <button
+              key={opt.tab}
+              onClick={() => handleFabChoice(opt.tab)}
+              className="flex items-center gap-2.5 rounded-xl border border-white/[0.08] bg-zinc-900 px-4 py-2.5 text-sm font-medium text-zinc-200 shadow-xl backdrop-blur-md transition-all hover:bg-zinc-800"
+            >
+              <opt.icon className="h-4 w-4 text-[#c4f441]" />
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* FAB Button */}
+      <button
+        onClick={() => setFabOpen((prev) => !prev)}
+        className={`fixed bottom-8 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#c4f441] text-zinc-900 shadow-lg transition-all hover:bg-[#d4ff51] active:bg-[#b4e431] ${
+          fabOpen ? "rotate-45" : ""
+        }`}
+      >
+        <Plus className="h-6 w-6" />
+      </button>
     </div>
   );
 }

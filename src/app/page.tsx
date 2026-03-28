@@ -18,9 +18,7 @@ import {
   Paperclip,
   X,
   FileText,
-  Clock,
 } from "lucide-react";
-import Link from "next/link";
 import { ChatUIRenderer } from "@/components/chat/ChatUIRenderer";
 import type { UIComponent } from "@/lib/ui-components";
 
@@ -630,7 +628,10 @@ function DashboardInner() {
       </div>
 
       {/* ── Input Bar ── */}
-      <div className="shrink-0 border-t border-white/[0.06] bg-zinc-950/80 backdrop-blur-xl px-4 py-3">
+      <div
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
+        className="shrink-0 border-t border-white/[0.06] bg-zinc-950/80 backdrop-blur-xl px-4 pt-3"
+      >
         <div className="mx-auto max-w-3xl">
           {/* Hidden file input */}
           <input
@@ -694,15 +695,6 @@ function DashboardInner() {
               <SquarePen className="h-4 w-4" />
             </button>
 
-            {/* Chat history button */}
-            <Link
-              href="/history"
-              className="shrink-0 rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-zinc-600 transition-colors hover:bg-white/[0.06] hover:text-zinc-400"
-              title="Chat history"
-            >
-              <Clock className="h-4 w-4" />
-            </Link>
-
             {/* Attach file button */}
             <button
               type="button"
@@ -723,7 +715,7 @@ function DashboardInner() {
                 onKeyDown={handleKeyDown}
                 placeholder="Ask about your finances..."
                 rows={1}
-                className="w-full overflow-hidden resize-none rounded-2xl border border-white/[0.08] bg-zinc-900/60 py-3 pl-4 pr-12 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-[#c4f441]/30 focus:outline-none focus:ring-1 focus:ring-[#c4f441]/20"
+                className="w-full overflow-hidden resize-none rounded-2xl border border-white/[0.08] bg-zinc-900/60 py-2.5 pl-4 pr-12 text-sm leading-6 text-zinc-200 placeholder:text-zinc-600 focus:border-[#c4f441]/30 focus:outline-none focus:ring-1 focus:ring-[#c4f441]/20"
                 disabled={isLoading}
               />
 
